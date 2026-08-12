@@ -13,6 +13,8 @@ import type { Country } from '../types'
 import type { GdpEntry } from '../services/worldbank'
 import { formatUsd } from '../utils/format'
 import { PALEO_ERAS } from '../data/paleoEras'
+import { PORTS, ROUTE_LEGS } from '../data/shippingRoutes'
+import type { Port } from '../data/shippingRoutes'
 
 type CountryFeature = Feature<Geometry, { name?: string }>
 
@@ -53,6 +55,7 @@ export default function GlobeView() {
   const gdpAll = useAppStore((s) => s.gdpAll)
   const timeTravel = useAppStore((s) => s.timeTravel)
   const eraIndex = useAppStore((s) => s.eraIndex)
+  const showRoutes = useAppStore((s) => s.showRoutes)
   const featsRef = useRef<CountryFeature[]>([])
 
   /* ---- 时间旅行贴图交叉淡化所需的引用 ---- */
@@ -274,6 +277,49 @@ export default function GlobeView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showFlags, countries, timeTravel])
 
+  // 航线图层：主要海运通道按枢纽港分段的动画弧线 + 港口标记
+  useEffect(() => {
+    const world = globeRef.current
+    if (!world) return
+    const zh = langRef.current.startsWith('zh')
+    if (showRoutes && !timeTravel) {
+      const portById = new Map(PORTS.map((p) => [p.id, p]))
+      const arcs = ROUTE_LEGS.map((leg) => {
+        const a = portById.get(leg.from)!
+        const b = portById.get(leg.to)!
+        return { ...leg, startLat: a.lat, startLng: a.lng, endLat: b.lat, endLng: b.lng }
+      })
+      world
+        .arcsData(arcs as unknown as object[])
+        .arcStartLat((d) => (d as { startLat: number }).startLat)
+        .arcStartLng((d) => (d as { startLng: number }).startLng)
+        .arcEndLat((d) => (d as { endLat: number }).endLat)
+        .arcEndLng((d) => (d as { endLng: number }).endLng)
+        .arcColor((d: object) => {
+          const w = (d as { weight: number }).weight
+          return w >= 3 ? 'rgba(56,189,248,0.9)' : w === 2 ? 'rgba(45,212,191,0.75)' : 'rgba(148,163,184,0.55)'
+        })
+        .arcStroke((d) => 0.25 + (d as { weight: number }).weight * 0.18)
+        .arcAltitudeAutoScale(0.35)
+        .arcDashLength(0.35)
+        .arcDashGap(0.15)
+        .arcDashAnimateTime(3000)
+      world
+        .labelsData(PORTS as unknown as object[])
+        .labelLat((d) => (d as Port).lat)
+        .labelLng((d) => (d as Port).lng)
+        .labelText((d) => (zh ? (d as Port).nameZh : (d as Port).nameEn))
+        .labelSize(0.7)
+        .labelDotRadius(0.28)
+        .labelColor(() => 'rgba(125,211,252,0.9)')
+        .labelResolution(2)
+    } else {
+      world.arcsData([])
+      world.labelsData([])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showRoutes, timeTravel, i18n.language])
+
   /** 加载并预处理某时代贴图：解码 + sRGB + 预上传 GPU，避免切换瞬间卡顿 */
   const loadEraTexture = async (world: GlobeInstance, ma: number): Promise<Texture> => {
     const cached = paleoTexRef.current.get(ma)
@@ -392,5 +438,6 @@ export default function GlobeView() {
     }
   }, [timeTravel, eraIndex])
 
-  return <div ref={containerRef} className="absolute inset-0" />
+  // z-0 创建层叠上下文，约束 globe.gl html 图层（国旗）不覆盖 UI 面板
+  return <div ref={containerRef} className="absolute inset-0 z-0" />
 }

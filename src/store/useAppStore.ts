@@ -18,6 +18,10 @@ interface AppState {
   timeTravel: boolean
   /** 当前时代索引（对应 PALEO_ERAS，0 为最古老） */
   eraIndex: number
+  /** 排行榜面板 */
+  showRankings: boolean
+  /** 航线图层 */
+  showRoutes: boolean
 
   select: (c: Country | null) => void
   toggleAutoRotate: () => void
@@ -26,6 +30,8 @@ interface AppState {
   setGdpAll: (data: Record<string, GdpEntry>) => void
   toggleTimeTravel: () => void
   setEraIndex: (i: number) => void
+  toggleRankings: () => void
+  toggleRoutes: () => void
 }
 
 // 国家数据是构建时静态化的，直接同步初始化
@@ -41,6 +47,8 @@ export const useAppStore = create<AppState>((set) => ({
   gdpAll: null,
   timeTravel: false,
   eraIndex: 0,
+  showRankings: false,
+  showRoutes: false,
 
   select: (c) => set({ selected: c }),
   toggleAutoRotate: () => set((s) => ({ autoRotate: !s.autoRotate })),
@@ -49,6 +57,8 @@ export const useAppStore = create<AppState>((set) => ({
   setGdpAll: (data) => set({ gdpAll: data }),
   // 进入时间旅行：从最古老时代开始，并关闭已打开的国家详情
   toggleTimeTravel: () =>
-    set((s) => ({ timeTravel: !s.timeTravel, eraIndex: 0, selected: null })),
+    set((s) => ({ timeTravel: !s.timeTravel, eraIndex: 0, selected: null, showRankings: false })),
   setEraIndex: (i) => set({ eraIndex: i }),
+  toggleRankings: () => set((s) => ({ showRankings: !s.showRankings })),
+  toggleRoutes: () => set((s) => ({ showRoutes: !s.showRoutes })),
 }))

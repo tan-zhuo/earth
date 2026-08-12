@@ -4,6 +4,7 @@ import GlobeView from './components/GlobeView'
 import Header from './components/Header'
 import InfoPanel from './components/InfoPanel'
 import TimeTravelBar from './components/TimeTravelBar'
+import RankingPanel from './components/RankingPanel'
 import { fetchAllGdp } from './services/worldbank'
 import { useAppStore } from './store/useAppStore'
 
@@ -42,6 +43,7 @@ export default function App() {
       <Header />
       <InfoPanel />
       <TimeTravelBar />
+      <RankingPanel />
 
       {/* 底部操作提示（未选中国家时显示） */}
       {!selected && !timeTravel && (

@@ -18,6 +18,10 @@ export default function Header() {
   const toggleFlags = useAppStore((s) => s.toggleFlags)
   const timeTravel = useAppStore((s) => s.timeTravel)
   const toggleTimeTravel = useAppStore((s) => s.toggleTimeTravel)
+  const showRankings = useAppStore((s) => s.showRankings)
+  const toggleRankings = useAppStore((s) => s.toggleRankings)
+  const showRoutes = useAppStore((s) => s.showRoutes)
+  const toggleRoutes = useAppStore((s) => s.toggleRoutes)
 
   const zh = i18n.language.startsWith('zh')
 
@@ -44,6 +48,12 @@ export default function Header() {
         {/* 时间旅行模式下没有国家概念，隐藏现代图层开关 */}
         {!timeTravel && (
           <>
+            <button onClick={toggleRankings} className={showRankings ? btnOn : btnOff}>
+              {t('rankingsBtn')}
+            </button>
+            <button onClick={toggleRoutes} className={showRoutes ? btnOn : btnOff}>
+              {t('layerRoutes')}
+            </button>
             <button onClick={toggleGdpBars} className={showGdpBars ? btnOn : btnOff}>
               {t('layerGdpBars')}
             </button>

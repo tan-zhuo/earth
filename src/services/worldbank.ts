@@ -13,6 +13,8 @@ const INDICATORS = {
   population: 'SP.POP.TOTL',
   gdp: 'NY.GDP.MKTP.CD',
   gdpPerCapita: 'NY.GDP.PCAP.CD',
+  exports: 'NE.EXP.GNFS.CD',
+  imports: 'NE.IMP.GNFS.CD',
 } as const
 
 async function fetchIndicator(iso2: string, indicator: string): Promise<WbRow | null> {
@@ -26,11 +28,15 @@ async function fetchIndicator(iso2: string, indicator: string): Promise<WbRow | 
   return rows.find((r) => r.value !== null) ?? null
 }
 
-/** 全球 GDP 一览（供 3D 柱状图使用），key 为 ISO3 */
+/** 全球经济数据一览（GDP + 进出口），key 为 ISO3 */
 export interface GdpEntry {
   gdp: number
   gdpYear: string
   gdpPerCapita: number | null
+  exports: number | null
+  exportsYear: string | null
+  imports: number | null
+  importsYear: string | null
 }
 
 async function fetchAllIndicator(indicator: string): Promise<Map<string, WbRow>> {
@@ -48,15 +54,17 @@ async function fetchAllIndicator(indicator: string): Promise<Map<string, WbRow>>
   return latest
 }
 
-/** 批量获取所有国家的 GDP 与人均 GDP，带 30 天本地缓存 */
+/** 批量获取所有国家的 GDP、人均 GDP、出口额、进口额，带 30 天本地缓存 */
 export async function fetchAllGdp(): Promise<Record<string, GdpEntry>> {
-  const key = 'earth:wb:all-gdp'
+  const key = 'earth:wb:econ-v1'
   const cached = getCache<Record<string, GdpEntry>>(key, CACHE_TTL)
   if (cached) return cached
 
-  const [gdpMap, pcMap] = await Promise.all([
+  const [gdpMap, pcMap, expMap, impMap] = await Promise.all([
     fetchAllIndicator(INDICATORS.gdp),
     fetchAllIndicator(INDICATORS.gdpPerCapita),
+    fetchAllIndicator(INDICATORS.exports),
+    fetchAllIndicator(INDICATORS.imports),
   ])
   const result: Record<string, GdpEntry> = {}
   for (const [iso3, row] of gdpMap) {
@@ -64,6 +72,10 @@ export async function fetchAllGdp(): Promise<Record<string, GdpEntry>> {
       gdp: row.value as number,
       gdpYear: row.date,
       gdpPerCapita: pcMap.get(iso3)?.value ?? null,
+      exports: expMap.get(iso3)?.value ?? null,
+      exportsYear: expMap.get(iso3)?.date ?? null,
+      imports: impMap.get(iso3)?.value ?? null,
+      importsYear: impMap.get(iso3)?.date ?? null,
     }
   }
   setCache(key, result)

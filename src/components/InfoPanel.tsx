@@ -59,6 +59,8 @@ export default function InfoPanel() {
   const { t, i18n } = useTranslation()
   const selected = useAppStore((s) => s.selected)
   const select = useAppStore((s) => s.select)
+  const gdpAll = useAppStore((s) => s.gdpAll)
+  const countries = useAppStore((s) => s.countries)
 
   const [stats, setStats] = useState<WbStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
@@ -108,6 +110,13 @@ export default function InfoPanel() {
   const region = zh ? (regionZh[selected.region] ?? selected.region) : selected.region
   const government = extra ? (zh ? extra.govZh : extra.govEn) : null
   const income = stats?.gdpPerCapita != null ? incomeGroupOf(stats.gdpPerCapita) : null
+
+  // 全球 GDP 排名与进出口（批量数据含世界/地区等聚合体，排名只与真实国家比较）
+  const econ = gdpAll?.[selected.cca3]
+  const gdpRank =
+    gdpAll && econ?.gdp != null
+      ? countries.filter((c) => (gdpAll[c.cca3]?.gdp ?? -Infinity) > econ.gdp).length + 1
+      : null
 
   const pendingDash = statsLoading ? (
     <span className="animate-pulse text-slate-500">…</span>
@@ -185,6 +194,11 @@ export default function InfoPanel() {
               stats?.gdp != null ? (
                 <>
                   {formatUsd(stats.gdp, lang)}
+                  {gdpRank != null && (
+                    <span className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-0.5 text-xs text-amber-300">
+                      {t('panel.gdpRank', { rank: gdpRank })}
+                    </span>
+                  )}
                   <YearTag year={stats.gdpYear} suffix={t('panel.dataYear')} />
                 </>
               ) : (
@@ -198,6 +212,33 @@ export default function InfoPanel() {
               stats?.gdpPerCapita != null ? `$${formatExact(stats.gdpPerCapita, lang)}` : pendingDash
             }
           />
+          <Row
+            label={t('panel.exports')}
+            value={
+              econ?.exports != null ? (
+                <>
+                  {formatUsd(econ.exports, lang)}
+                  <YearTag year={econ.exportsYear} suffix={t('panel.dataYear')} />
+                </>
+              ) : (
+                pendingDash
+              )
+            }
+          />
+          <Row
+            label={t('panel.imports')}
+            value={
+              econ?.imports != null ? (
+                <>
+                  {formatUsd(econ.imports, lang)}
+                  <YearTag year={econ.importsYear} suffix={t('panel.dataYear')} />
+                </>
+              ) : (
+                pendingDash
+              )
+            }
+          />
+          <p className="mt-1 text-[10px] text-slate-600">{t('panel.tradeNote')}</p>
           {income && (
             <span
               className={`mt-2 inline-block rounded-full border px-3 py-1 text-xs font-medium ${incomeBadgeColor[income]}`}
