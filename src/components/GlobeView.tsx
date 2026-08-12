@@ -56,6 +56,7 @@ export default function GlobeView() {
   const timeTravel = useAppStore((s) => s.timeTravel)
   const eraIndex = useAppStore((s) => s.eraIndex)
   const showRoutes = useAppStore((s) => s.showRoutes)
+  const view = useAppStore((s) => s.view)
   const featsRef = useRef<CountryFeature[]>([])
 
   /* ---- 时间旅行贴图交叉淡化所需的引用 ---- */
@@ -451,6 +452,20 @@ export default function GlobeView() {
       world.polygonsData(featsRef.current as object[])
     }
   }, [timeTravel, eraIndex])
+
+  // 切到其他尺度视图时隐藏并暂停渲染循环（保留实例，返回地球免重建）
+  useEffect(() => {
+    const world = globeRef.current
+    const el = containerRef.current
+    if (!world || !el) return
+    if (view === 'earth') {
+      el.style.display = ''
+      world.resumeAnimation()
+    } else {
+      el.style.display = 'none'
+      world.pauseAnimation()
+    }
+  }, [view])
 
   // z-0 创建层叠上下文，约束 globe.gl html 图层（国旗）不覆盖 UI 面板
   return <div ref={containerRef} className="absolute inset-0 z-0" />

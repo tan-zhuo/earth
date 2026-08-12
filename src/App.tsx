@@ -5,6 +5,10 @@ import Header from './components/Header'
 import InfoPanel from './components/InfoPanel'
 import TimeTravelBar from './components/TimeTravelBar'
 import RankingPanel from './components/RankingPanel'
+import MoonView from './components/space/MoonView'
+import SolarSystemView from './components/space/SolarSystemView'
+import GalaxyView from './components/space/GalaxyView'
+import UniverseView from './components/space/UniverseView'
 import { fetchAllGdp } from './services/worldbank'
 import { useAppStore } from './store/useAppStore'
 
@@ -12,6 +16,7 @@ export default function App() {
   const { t, i18n } = useTranslation()
   const selected = useAppStore((s) => s.selected)
   const timeTravel = useAppStore((s) => s.timeTravel)
+  const view = useAppStore((s) => s.view)
   const setGdpAll = useAppStore((s) => s.setGdpAll)
 
   // 启动时批量拉取全球 GDP（一次请求 + 30 天缓存），供 3D 柱状图使用
@@ -39,14 +44,24 @@ export default function App() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-slate-950 text-slate-100">
+      {/* 地球视图常驻（隐藏时暂停渲染），其他尺度视图按需挂载 */}
       <GlobeView />
-      <Header />
-      <InfoPanel />
-      <TimeTravelBar />
-      <RankingPanel />
+      {view === 'moon' && <MoonView />}
+      {view === 'solar' && <SolarSystemView />}
+      {view === 'galaxy' && <GalaxyView />}
+      {view === 'universe' && <UniverseView />}
 
-      {/* 底部操作提示（未选中国家时显示） */}
-      {!selected && !timeTravel && (
+      <Header />
+      {view === 'earth' && (
+        <>
+          <InfoPanel />
+          <TimeTravelBar />
+          <RankingPanel />
+        </>
+      )}
+
+      {/* 底部操作提示（地球视图未选中国家时显示） */}
+      {view === 'earth' && !selected && !timeTravel && (
         <p className="pointer-events-none fixed inset-x-0 bottom-4 z-10 text-center text-xs text-slate-500">
           {t('hint')}
         </p>

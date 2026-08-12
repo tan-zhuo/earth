@@ -12,6 +12,13 @@ export default {
     layerFlags: 'Flags',
     timeTravel: 'Time travel',
     layerRoutes: 'Sea routes',
+    views: {
+      earth: 'Earth',
+      moon: 'Moon',
+      solar: 'Solar System',
+      galaxy: 'Galaxy',
+      universe: 'Universe',
+    },
     rankingsBtn: 'Rankings',
     rankings: {
       title: 'Global Rankings',

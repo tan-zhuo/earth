@@ -3,7 +3,12 @@ import type { Country } from '../types'
 import { getAllCountries } from '../services/countries'
 import type { GdpEntry } from '../services/worldbank'
 
+/** 宇宙尺度阶梯：地球 → 月球 → 太阳系 → 银河系 → 可观测宇宙 */
+export type SpaceView = 'earth' | 'moon' | 'solar' | 'galaxy' | 'universe'
+
 interface AppState {
+  /** 当前尺度视图 */
+  view: SpaceView
   countries: Country[]
   /** ccn3（ISO numeric）→ Country，供 GeoJSON feature.id 快速查找 */
   byCcn3: Map<string, Country>
@@ -32,12 +37,14 @@ interface AppState {
   setEraIndex: (i: number) => void
   toggleRankings: () => void
   toggleRoutes: () => void
+  setView: (v: SpaceView) => void
 }
 
 // 国家数据是构建时静态化的，直接同步初始化
 const countries = getAllCountries()
 
 export const useAppStore = create<AppState>((set) => ({
+  view: 'earth',
   countries,
   byCcn3: new Map(countries.filter((c) => c.ccn3).map((c) => [c.ccn3, c])),
   selected: null,
@@ -61,4 +68,7 @@ export const useAppStore = create<AppState>((set) => ({
   setEraIndex: (i) => set({ eraIndex: i }),
   toggleRankings: () => set((s) => ({ showRankings: !s.showRankings })),
   toggleRoutes: () => set((s) => ({ showRoutes: !s.showRoutes })),
+  // 切换尺度视图：离开地球时收起地球相关面板与模式
+  setView: (v) =>
+    set({ view: v, selected: null, showRankings: false, timeTravel: false, eraIndex: 0 }),
 }))

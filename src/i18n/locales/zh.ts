@@ -12,6 +12,13 @@ export default {
     layerFlags: '国旗',
     timeTravel: '时间旅行',
     layerRoutes: '航线',
+    views: {
+      earth: '地球',
+      moon: '月球',
+      solar: '太阳系',
+      galaxy: '银河系',
+      universe: '宇宙',
+    },
     rankingsBtn: '排行榜',
     rankings: {
       title: '全球排行榜',
