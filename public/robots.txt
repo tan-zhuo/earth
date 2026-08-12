@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://earth-tan-zhuo.vercel.app/sitemap.xml

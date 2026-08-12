@@ -71,6 +71,25 @@ earth/
 - 响应式：桌面右侧面板 / 移动端底部抽屉
 - 返回地球总览按钮
 
+## 部署（Vercel）
+
+仓库已含 `vercel.json`（静态资源缓存头）。两种方式：
+
+1. **推荐**：在 [vercel.com/new](https://vercel.com/new) 导入 GitHub 仓库 `tan-zhuo/earth`，框架自动识别为 Vite，直接 Deploy。之后每次 push 自动部署。
+2. CLI：`npx vercel login && npx vercel --prod`。
+
+已接入 **Vercel Analytics**（访问量）与 **Speed Insights**（Core Web Vitals），部署后在 Vercel 项目的 Analytics / Speed Insights 标签页启用即可看到数据（免费额度够用），本地开发不上报。
+
+> 部署后把 `index.html`、`public/robots.txt`、`public/sitemap.xml` 中的占位域名 `earth-tan-zhuo.vercel.app` 替换为实际分配的域名。
+
+## SEO
+
+- 完整 meta：description / keywords / canonical / Open Graph / Twitter Card / theme-color
+- `og.png` 分享图、`robots.txt`、`sitemap.xml`（含 zh-CN / en hreflang）
+- Schema.org WebApplication 结构化数据（JSON-LD）
+- 标题与 `<html lang>` 随语言、选中国家动态更新（如「中国 - Earth · 3D 互动地球」）
+- `<noscript>` 双语降级文案
+
 ## 后续计划
 
 - Phase 2：国家搜索、国歌播放（或占位外链）、主要出口商品与资源模块

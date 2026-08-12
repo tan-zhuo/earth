@@ -4,10 +4,75 @@
     <meta charset="UTF-8" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌍</text></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Earth · 3D 地球</title>
+    <meta name="theme-color" content="#020617" />
+
+    <!-- SEO 基础（部署后请把 earth-tan-zhuo.vercel.app 替换为实际域名） -->
+    <title>Earth · 3D 互动地球 | Interactive 3D World Atlas</title>
+    <meta
+      name="description"
+      content="免费的交互式 3D 地球：旋转缩放地球，点击任意国家查看国旗、首都、人口、GDP、政治体制等完整信息，支持中英文切换。Free interactive 3D globe: explore every country's flag, capital, population, GDP and government, in English and Chinese."
+    />
+    <meta
+      name="keywords"
+      content="3D地球,互动地图,世界地图,国家信息,GDP,国旗,3D globe, interactive world map, country facts, world atlas"
+    />
+    <link rel="canonical" href="https://earth-tan-zhuo.vercel.app/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Earth" />
+    <meta property="og:title" content="Earth · 3D 互动地球 | Interactive 3D World Atlas" />
+    <meta
+      property="og:description"
+      content="旋转缩放 3D 地球，点击任意国家查看国旗、人口、GDP、政体等信息，中英双语。Explore every country on an interactive 3D globe."
+    />
+    <meta property="og:url" content="https://earth-tan-zhuo.vercel.app/" />
+    <meta property="og:image" content="https://earth-tan-zhuo.vercel.app/og.png" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="800" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:locale:alternate" content="en_US" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Earth · 3D 互动地球 | Interactive 3D World Atlas" />
+    <meta
+      name="twitter:description"
+      content="旋转缩放 3D 地球，点击任意国家查看国旗、人口、GDP、政体等信息，中英双语。"
+    />
+    <meta name="twitter:image" content="https://earth-tan-zhuo.vercel.app/og.png" />
+
+    <!-- 结构化数据 -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Earth · 3D 互动地球",
+        "alternateName": "Earth · Interactive 3D World Atlas",
+        "url": "https://earth-tan-zhuo.vercel.app/",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Web",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "inLanguage": ["zh-CN", "en"],
+        "description": "交互式 3D 地球应用：点击任意国家查看国旗、首都、人口、GDP、政治体制等信息，支持中英文切换。"
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <!-- 无 JS 时的可索引降级内容 -->
+    <noscript>
+      <h1>Earth · 3D 互动地球 | Interactive 3D World Atlas</h1>
+      <p>
+        交互式 3D 地球：旋转、缩放地球，点击任意国家查看国旗、首都、人口、GDP、政治体制等完整信息，支持中英文切换。本应用需要启用
+        JavaScript。
+      </p>
+      <p>
+        Interactive 3D globe: spin and zoom the Earth, click any country to see its flag, capital,
+        population, GDP and system of government, in English and Chinese. This app requires
+        JavaScript.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
