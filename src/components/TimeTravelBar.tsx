@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/useAppStore'
 import { PALEO_ERAS } from '../data/paleoEras'
 
-const PLAY_INTERVAL = 1800 // 自动播放每个时代停留毫秒数
+const PLAY_INTERVAL = 1500 // 自动播放每个时代停留毫秒数（含 700ms 交叉淡化）
 
 export default function TimeTravelBar() {
   const { t, i18n } = useTranslation()
@@ -14,15 +14,9 @@ export default function TimeTravelBar() {
 
   const zh = i18n.language.startsWith('zh')
 
-  // 进入模式时预加载全部时代贴图，保证拖动/播放流畅
+  // 贴图预载由 GlobeView 负责（解码 + GPU 上传），这里只需在退出时停止播放
   useEffect(() => {
-    if (!timeTravel) {
-      setPlaying(false)
-      return
-    }
-    for (const era of PALEO_ERAS) {
-      if (era.ma > 0) new Image().src = `/paleo/${era.ma}.jpg`
-    }
+    if (!timeTravel) setPlaying(false)
   }, [timeTravel])
 
   // 自动播放：按时代逐步推进到现代

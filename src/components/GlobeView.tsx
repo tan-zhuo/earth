@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 import Globe from 'globe.gl'
 import type { GlobeInstance } from 'globe.gl'
+import { TextureLoader, SRGBColorSpace, MeshPhongMaterial } from 'three'
+import type { Mesh, Texture } from 'three'
 import { feature } from 'topojson-client'
 import type { Topology, GeometryCollection } from 'topojson-specification'
 import type { Feature, Geometry } from 'geojson'
@@ -52,6 +54,16 @@ export default function GlobeView() {
   const timeTravel = useAppStore((s) => s.timeTravel)
   const eraIndex = useAppStore((s) => s.eraIndex)
   const featsRef = useRef<CountryFeature[]>([])
+
+  /* ---- 时间旅行贴图交叉淡化所需的引用 ---- */
+  /** ma → 已解码并上传 GPU 的贴图（key 0 = 现代夜景） */
+  const paleoTexRef = useRef<Map<number, Texture>>(new Map())
+  /** 叠加层网格（与地球共享几何体，用于 crossfade） */
+  const paleoMeshRef = useRef<{ base: Mesh; overlay: Mesh } | null>(null)
+  const fadeAnimRef = useRef(0)
+  /** 当前应展示的时代 ma（异步加载完成后校验用） */
+  const eraTargetRef = useRef<number | null>(null)
+  const paleoPreloadedRef = useRef(false)
 
   const { i18n } = useTranslation()
 
@@ -262,16 +274,120 @@ export default function GlobeView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showFlags, countries, timeTravel])
 
-  // 时间旅行：切换古地理贴图，隐藏国界（远古地球没有国家）
+  /** 加载并预处理某时代贴图：解码 + sRGB + 预上传 GPU，避免切换瞬间卡顿 */
+  const loadEraTexture = async (world: GlobeInstance, ma: number): Promise<Texture> => {
+    const cached = paleoTexRef.current.get(ma)
+    if (cached) return cached
+    const url = ma === 0 ? '/textures/earth-night.jpg' : `/paleo/${ma}.jpg`
+    const tex = await new TextureLoader().loadAsync(url)
+    tex.colorSpace = SRGBColorSpace
+    world.renderer().initTexture(tex) // 提前上传 GPU，消除首次使用时的掉帧
+    paleoTexRef.current.set(ma, tex)
+    return tex
+  }
+
+  /** 找到地球表面网格并克隆出透明叠加层（共享几何体保证贴图完全对齐） */
+  const ensurePaleoOverlay = (world: GlobeInstance): { base: Mesh; overlay: Mesh } | null => {
+    if (paleoMeshRef.current) return paleoMeshRef.current
+    let base: Mesh | undefined
+    world.scene().traverse((o) => {
+      const m = o as Mesh & { geometry?: { parameters?: { radius?: number } } }
+      // 地球表面：半径 100 的 Phong 网格（同半径的大气层是 ShaderMaterial，需排除）
+      if (
+        !base &&
+        m.isMesh &&
+        m.geometry?.parameters?.radius === 100 &&
+        (m.material as { type?: string })?.type === 'MeshPhongMaterial'
+      )
+        base = m
+    })
+    if (!base) return null
+    const baseMat = base.material as MeshPhongMaterial
+    if (baseMat.map) paleoTexRef.current.set(0, baseMat.map) // 现代夜景贴图入缓存
+    const overlay = base.clone()
+    // 不 clone 原材质（globe.gl 的材质含 null 颜色槽，clone 会崩溃），新建独立 Phong
+    const overlayMat = new MeshPhongMaterial({ transparent: true, opacity: 0 })
+    overlay.material = overlayMat
+    overlay.renderOrder = 1
+    base.parent?.add(overlay)
+    paleoMeshRef.current = { base, overlay }
+    return paleoMeshRef.current
+  }
+
+  /** 交叉淡化到目标贴图（可被新的切换随时打断） */
+  const fadeToTexture = (tex: Texture) => {
+    const meshes = paleoMeshRef.current
+    if (!meshes) return
+    const baseMat = meshes.base.material as MeshPhongMaterial
+    const overlayMat = meshes.overlay.material as MeshPhongMaterial
+    cancelAnimationFrame(fadeAnimRef.current)
+    // 打断进行中的淡化：把上一个目标先落到底层，避免回跳
+    if (overlayMat.opacity > 0 && overlayMat.map) {
+      baseMat.map = overlayMat.map
+      baseMat.needsUpdate = true
+    }
+    if (baseMat.map === tex) {
+      overlayMat.opacity = 0
+      return
+    }
+    overlayMat.map = tex
+    overlayMat.needsUpdate = true
+    overlayMat.opacity = 0
+    const DURATION = 700
+    const start = performance.now()
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / DURATION)
+      overlayMat.opacity = p * p * (3 - 2 * p) // smoothstep 缓动
+      if (p < 1) {
+        fadeAnimRef.current = requestAnimationFrame(tick)
+      } else {
+        baseMat.map = tex
+        baseMat.needsUpdate = true
+        overlayMat.opacity = 0
+      }
+    }
+    fadeAnimRef.current = requestAnimationFrame(tick)
+  }
+
+  // 时间旅行：预载全部时代贴图，切换时代时交叉淡化，隐藏国界（远古地球没有国家）
   useEffect(() => {
     const world = globeRef.current
     if (!world) return
     if (timeTravel) {
-      const era = PALEO_ERAS[eraIndex]
-      world.globeImageUrl(era.ma === 0 ? '/textures/earth-night.jpg' : `/paleo/${era.ma}.jpg`)
       world.polygonsData([])
+      if (!ensurePaleoOverlay(world)) return
+      // 首次进入：后台按顺序预载全部时代贴图（顺序加载避免 15 张图并发解码挤占主线程）
+      if (!paleoPreloadedRef.current) {
+        paleoPreloadedRef.current = true
+        void (async () => {
+          for (const era of PALEO_ERAS) {
+            try {
+              await loadEraTexture(world, era.ma)
+            } catch {
+              // 单张失败不影响其余预载
+            }
+          }
+        })()
+      }
+      const ma = PALEO_ERAS[eraIndex].ma
+      eraTargetRef.current = ma
+      void loadEraTexture(world, ma)
+        .then((tex) => {
+          // 加载期间用户可能又切了时代，只展示最新目标
+          if (eraTargetRef.current === ma) fadeToTexture(tex)
+        })
+        .catch(() => {})
     } else {
-      world.globeImageUrl('/textures/earth-night.jpg')
+      eraTargetRef.current = null
+      cancelAnimationFrame(fadeAnimRef.current)
+      const meshes = paleoMeshRef.current
+      const nightTex = paleoTexRef.current.get(0)
+      if (meshes && nightTex) {
+        ;(meshes.overlay.material as MeshPhongMaterial).opacity = 0
+        const baseMat = meshes.base.material as MeshPhongMaterial
+        baseMat.map = nightTex
+        baseMat.needsUpdate = true
+      }
       world.polygonsData(featsRef.current as object[])
     }
   }, [timeTravel, eraIndex])
