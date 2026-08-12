@@ -6,6 +6,7 @@ import {
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { useTranslation } from 'react-i18next'
 import { GALAXY_FACTS } from '../../data/space'
+import { useAppStore } from '../../store/useAppStore'
 import FactCard from './FactCard'
 
 const STAR_COUNT = 42000
@@ -37,6 +38,22 @@ export default function GalaxyView() {
     controls.enableDamping = true
     controls.minDistance = 30
     controls.maxDistance = 400
+
+    // 滚轮穿越尺度：缩到最小回到太阳系，拉到最大进入可观测宇宙
+    const mountedAt = performance.now()
+    let jumped = false
+    const onScaleCross = () => {
+      if (jumped || performance.now() - mountedAt < 800) return
+      const d = camera.position.length()
+      if (d <= 33) {
+        jumped = true
+        useAppStore.getState().setView('solar')
+      } else if (d >= 392) {
+        jumped = true
+        useAppStore.getState().setView('universe')
+      }
+    }
+    controls.addEventListener('change', onScaleCross)
 
     // 旋臂星场
     const positions = new Float32Array((STAR_COUNT + BULGE_COUNT) * 3)
@@ -123,6 +140,7 @@ export default function GalaxyView() {
     return () => {
       cancelAnimationFrame(raf)
       ro.disconnect()
+      controls.removeEventListener('change', onScaleCross)
       renderer.dispose()
       el.removeChild(renderer.domElement)
       sunLabel.remove()

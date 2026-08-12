@@ -4,6 +4,7 @@ import type { GlobeInstance } from 'globe.gl'
 import { useTranslation } from 'react-i18next'
 import { MOON_FACTS, MOON_SITES } from '../../data/space'
 import type { MoonSite } from '../../data/space'
+import { useAppStore } from '../../store/useAppStore'
 import FactCard from './FactCard'
 
 /** 月球视图：globe.gl 渲染月面 + 历史着陆点标记 */
@@ -28,6 +29,13 @@ export default function MoonView() {
     world.controls().autoRotate = true
     world.controls().autoRotateSpeed = 0.5
     world.pointOfView({ lat: 10, lng: 0, altitude: 2.2 }, 0)
+
+    // 滚轮缩小到底 → 从月球拉远进入太阳系
+    const mountedAt = performance.now()
+    world.onZoom((pov) => {
+      if (performance.now() - mountedAt < 1200) return
+      if (pov.altitude > 4.2) useAppStore.getState().setView('solar')
+    })
 
     const ro = new ResizeObserver(() => world.width(el.clientWidth).height(el.clientHeight))
     ro.observe(el)

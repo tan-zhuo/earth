@@ -6,6 +6,7 @@ import {
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { useTranslation } from 'react-i18next'
 import { UNIVERSE_FACTS } from '../../data/space'
+import { useAppStore } from '../../store/useAppStore'
 import FactCard from './FactCard'
 
 const CLUSTERS = 130
@@ -34,6 +35,18 @@ export default function UniverseView() {
     controls.enableDamping = true
     controls.minDistance = 40
     controls.maxDistance = 500
+
+    // 滚轮穿越尺度：缩到最小回到银河系（已是最大尺度，无下一级）
+    const mountedAt = performance.now()
+    let jumped = false
+    const onScaleCross = () => {
+      if (jumped || performance.now() - mountedAt < 800) return
+      if (camera.position.length() <= 44) {
+        jumped = true
+        useAppStore.getState().setView('galaxy')
+      }
+    }
+    controls.addEventListener('change', onScaleCross)
 
     const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5
 
@@ -116,6 +129,7 @@ export default function UniverseView() {
     return () => {
       cancelAnimationFrame(raf)
       ro.disconnect()
+      controls.removeEventListener('change', onScaleCross)
       renderer.dispose()
       el.removeChild(renderer.domElement)
       span.remove()

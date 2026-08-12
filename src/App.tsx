@@ -60,10 +60,18 @@ export default function App() {
         </>
       )}
 
+      {/* 尺度切换淡入过渡（key 变化触发重播） */}
+      <div key={view} className="view-fade pointer-events-none fixed inset-0 z-40 bg-slate-950" />
+
       {/* 底部操作提示（地球视图未选中国家时显示） */}
       {view === 'earth' && !selected && !timeTravel && (
         <p className="pointer-events-none fixed inset-x-0 bottom-4 z-10 text-center text-xs text-slate-500">
-          {t('hint')}
+          {t('hint')} · {t('scaleHintEarth')}
+        </p>
+      )}
+      {view !== 'earth' && (
+        <p className="pointer-events-none fixed inset-x-0 bottom-4 z-10 text-center text-xs text-slate-500">
+          {t(view === 'universe' ? 'scaleHintUniverse' : 'scaleHintSpace')}
         </p>
       )}
 

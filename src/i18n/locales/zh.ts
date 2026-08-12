@@ -34,6 +34,9 @@ export default {
     timeTravelMa: '百万年前',
     timeTravelNow: '现代',
     hint: '拖动旋转 · 滚轮缩放 · 点击国家查看详情',
+    scaleHintEarth: '持续缩小可进入太阳系',
+    scaleHintSpace: '滚轮缩小进入更大尺度 · 放大返回上一级',
+    scaleHintUniverse: '已是最大尺度 · 滚轮放大返回银河系',
     authorBlog: '作者博客',
 
     panel: {

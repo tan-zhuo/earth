@@ -58,6 +58,7 @@ export default function GlobeView() {
   const showRoutes = useAppStore((s) => s.showRoutes)
   const view = useAppStore((s) => s.view)
   const featsRef = useRef<CountryFeature[]>([])
+  const enteredEarthAtRef = useRef(0)
 
   /* ---- 时间旅行贴图交叉淡化所需的引用 ---- */
   /** ma → 已解码并上传 GPU 的贴图（key 0 = 现代夜景） */
@@ -165,6 +166,14 @@ export default function GlobeView() {
     world.onPolygonClick((f) => {
       const c = countryOf(f as CountryFeature)
       if (c) select(c)
+    })
+
+    // 滚轮缩小到底 → 穿越到太阳系视图（入场 1.2s 内不触发，防止编程视角动画误触）
+    world.onZoom((pov) => {
+      const s = useAppStore.getState()
+      if (s.view !== 'earth' || s.timeTravel) return
+      if (performance.now() - enteredEarthAtRef.current < 1200) return
+      if (pov.altitude > 4.2) s.setView('solar')
     })
 
     // 加载国家边界（world-atlas TopoJSON → GeoJSON），剔除南极洲
@@ -461,6 +470,10 @@ export default function GlobeView() {
     if (view === 'earth') {
       el.style.display = ''
       world.resumeAnimation()
+      enteredEarthAtRef.current = performance.now()
+      // 从太阳系缩放回来时视角还在穿越阈值之外，立即拉回总览高度避免再次触发
+      const pov = world.pointOfView()
+      if (pov.altitude > 3.5) world.pointOfView({ ...pov, altitude: OVERVIEW_ALTITUDE }, 0)
     } else {
       el.style.display = 'none'
       world.pauseAnimation()

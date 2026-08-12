@@ -34,6 +34,9 @@ export default {
     timeTravelMa: 'Ma ago',
     timeTravelNow: 'Present',
     hint: 'Drag to rotate · Scroll to zoom · Click a country for details',
+    scaleHintEarth: 'Keep zooming out to reach the Solar System',
+    scaleHintSpace: 'Zoom out for a larger scale · zoom in to go back',
+    scaleHintUniverse: 'Largest scale · zoom in to return to the Galaxy',
     authorBlog: 'Blog',
 
     panel: {

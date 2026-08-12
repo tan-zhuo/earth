@@ -36,6 +36,19 @@ body {
 .panel-enter {
   animation: slide-up 0.35s ease both;
 }
+
+/* 尺度视图切换时的淡入过渡 */
+@keyframes view-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.view-fade {
+  animation: view-fade 0.6s ease 0.05s both;
+}
 @media (min-width: 768px) {
   .panel-enter {
     animation: slide-in-right 0.35s ease both;

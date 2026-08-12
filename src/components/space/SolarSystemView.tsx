@@ -8,6 +8,7 @@ import {
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { useTranslation } from 'react-i18next'
 import { PLANETS, SUN_FACTS, SOLAR_NOTE } from '../../data/space'
+import { useAppStore } from '../../store/useAppStore'
 import FactCard from './FactCard'
 
 /** 生成太阳光晕贴图（径向渐变，避免外部资源） */
@@ -49,6 +50,22 @@ export default function SolarSystemView() {
     controls.enableDamping = true
     controls.minDistance = 40
     controls.maxDistance = 600
+
+    // 滚轮穿越尺度：缩到最小回到地球，拉到最大进入银河系（入场 800ms 免触发）
+    const mountedAt = performance.now()
+    let jumped = false
+    const onScaleCross = () => {
+      if (jumped || performance.now() - mountedAt < 800) return
+      const d = camera.position.length()
+      if (d <= 44) {
+        jumped = true
+        useAppStore.getState().setView('earth')
+      } else if (d >= 590) {
+        jumped = true
+        useAppStore.getState().setView('galaxy')
+      }
+    }
+    controls.addEventListener('change', onScaleCross)
 
     scene.add(new AmbientLight(0xffffff, 0.5))
     const sunLight = new PointLight(0xfff3d6, 2200, 0, 1.6)
@@ -140,7 +157,17 @@ export default function SolarSystemView() {
       labelEls.set(id, span)
     }
     mkLabel('sun', zh ? '太阳' : 'Sun')
-    for (const p of PLANETS) mkLabel(p.id, zh ? p.nameZh : p.nameEn)
+    for (const p of PLANETS)
+      mkLabel(
+        p.id,
+        p.id === 'earth'
+          ? zh
+            ? '地球 · 点击进入'
+            : 'Earth · click to enter'
+          : zh
+            ? p.nameZh
+            : p.nameEn,
+      )
 
     const projectLabel = (id: string, worldPos: Vector3) => {
       const span = labelEls.get(id)
@@ -164,7 +191,14 @@ export default function SolarSystemView() {
       )
       raycaster.setFromCamera(ndc, camera)
       const hit = raycaster.intersectObjects(clickable, false)[0]
-      if (hit) setSelectedId(hit.object.userData.id as string)
+      if (!hit) return
+      const id = hit.object.userData.id as string
+      // 点击地球：直接落回地球视图
+      if (id === 'earth') {
+        useAppStore.getState().setView('earth')
+        return
+      }
+      setSelectedId(id)
     }
     renderer.domElement.addEventListener('click', onClick)
 
@@ -197,6 +231,7 @@ export default function SolarSystemView() {
     return () => {
       cancelAnimationFrame(raf)
       ro.disconnect()
+      controls.removeEventListener('change', onScaleCross)
       renderer.domElement.removeEventListener('click', onClick)
       renderer.dispose()
       el.removeChild(renderer.domElement)
