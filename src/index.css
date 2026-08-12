@@ -1,0 +1,43 @@
+@import 'tailwindcss';
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #020617;
+  overflow: hidden;
+}
+
+/* 详情面板入场动画：移动端从底部升起，桌面端从右侧滑入 */
+@keyframes slide-up {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes slide-in-right {
+  from {
+    transform: translateX(48px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.panel-enter {
+  animation: slide-up 0.35s ease both;
+}
+@media (min-width: 768px) {
+  .panel-enter {
+    animation: slide-in-right 0.35s ease both;
+  }
+}
