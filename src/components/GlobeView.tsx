@@ -87,10 +87,32 @@ export default function GlobeView() {
       .polygonsTransitionDuration(200)
 
     globeRef.current = world
+    if (import.meta.env.DEV) (window as unknown as { __world?: GlobeInstance }).__world = world
     world.controls().autoRotate = true
     world.controls().autoRotateSpeed = 0.4
     world.controls().minDistance = 130
     world.pointOfView({ lat: 25, lng: 105, altitude: OVERVIEW_ALTITUDE }, 0)
+
+    // 自转的实现是相机环绕（OrbitControls.autoRotate），若星空天球留在场景里，
+    // 星星会跟着流动，暴露出“镜头在飞”。把天球挂到相机上后星空相对视角静止，
+    // 画面上便只有地球在转 —— 视觉上等价于真正的地球自转，
+    // 且不破坏 globe.gl 的经纬度飞行与拾取计算。
+    const attachSkyToCamera = (): boolean => {
+      const scene = world.scene()
+      const sky = scene.children.find((o: unknown) => {
+        const m = o as { isMesh?: boolean; material?: { side?: number } }
+        return !!m.isMesh && m.material?.side === 1 // BackSide 的背景天球
+      })
+      if (!sky) return false
+      const camera = world.camera()
+      scene.add(camera) // 相机默认不在场景树中，加入后其子节点才会被渲染
+      camera.add(sky)
+      return true
+    }
+    // 背景贴图异步加载，轮询直到天球出现并挂载成功
+    const skyTimer = window.setInterval(() => {
+      if (attachSkyToCamera()) window.clearInterval(skyTimer)
+    }, 200)
 
     applyStyles(world)
 
@@ -122,6 +144,7 @@ export default function GlobeView() {
     ro.observe(el)
 
     return () => {
+      window.clearInterval(skyTimer)
       ro.disconnect()
       world._destructor()
       globeRef.current = null
