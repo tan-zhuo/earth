@@ -3,6 +3,8 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/useAppStore'
 import { fetchStats } from '../services/worldbank'
+import { fetchCountryHistory } from '../services/wikipedia'
+import type { WikiSummary } from '../services/wikipedia'
 import { countryExtras } from '../data/countryExtras'
 import { incomeGroupOf } from '../types'
 import type { WbStats } from '../types'
@@ -60,6 +62,8 @@ export default function InfoPanel() {
 
   const [stats, setStats] = useState<WbStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
+  const [history, setHistory] = useState<WikiSummary | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
 
   // 选中国家后按需拉取世界银行数据（人口 + GDP，带本地缓存）
   useEffect(() => {
@@ -75,6 +79,21 @@ export default function InfoPanel() {
       cancelled = true
     }
   }, [selected])
+
+  // 历史摘要来自维基百科，随语言切换重新获取（有本地缓存）
+  useEffect(() => {
+    setHistory(null)
+    if (!selected) return
+    let cancelled = false
+    setHistoryLoading(true)
+    fetchCountryHistory(selected, i18n.language.startsWith('zh') ? 'zh' : 'en')
+      .then((h) => !cancelled && setHistory(h))
+      .catch(() => !cancelled && setHistory(null))
+      .finally(() => !cancelled && setHistoryLoading(false))
+    return () => {
+      cancelled = true
+    }
+  }, [selected, i18n.language])
 
   if (!selected) return null
 
@@ -193,6 +212,26 @@ export default function InfoPanel() {
             label={t('panel.government')}
             value={government ?? <span className="text-slate-500">{t('panel.govUnavailable')}</span>}
           />
+        </Section>
+
+        <Section title={t('panel.history')}>
+          {historyLoading ? (
+            <p className="animate-pulse py-1 text-sm text-slate-400">{t('panel.historyLoading')}</p>
+          ) : history ? (
+            <>
+              <p className="text-sm leading-relaxed text-slate-300">{history.extract}</p>
+              <a
+                href={history.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-block text-xs text-sky-400 transition hover:text-sky-300"
+              >
+                {t('panel.historyMore')}
+              </a>
+            </>
+          ) : (
+            <p className="text-sm text-slate-500">{t('panel.historyUnavailable')}</p>
+          )}
         </Section>
       </div>
     </aside>

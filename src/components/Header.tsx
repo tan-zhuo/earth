@@ -16,6 +16,8 @@ export default function Header() {
   const toggleGdpBars = useAppStore((s) => s.toggleGdpBars)
   const showFlags = useAppStore((s) => s.showFlags)
   const toggleFlags = useAppStore((s) => s.toggleFlags)
+  const timeTravel = useAppStore((s) => s.timeTravel)
+  const toggleTimeTravel = useAppStore((s) => s.toggleTimeTravel)
 
   const zh = i18n.language.startsWith('zh')
 
@@ -36,12 +38,20 @@ export default function Header() {
             ← {t('backToGlobe')}
           </button>
         )}
-        <button onClick={toggleGdpBars} className={showGdpBars ? btnOn : btnOff}>
-          {t('layerGdpBars')}
+        <button onClick={toggleTimeTravel} className={timeTravel ? btnOn : btnOff}>
+          {t('timeTravel')}
         </button>
-        <button onClick={toggleFlags} className={showFlags ? btnOn : btnOff}>
-          {t('layerFlags')}
-        </button>
+        {/* 时间旅行模式下没有国家概念，隐藏现代图层开关 */}
+        {!timeTravel && (
+          <>
+            <button onClick={toggleGdpBars} className={showGdpBars ? btnOn : btnOff}>
+              {t('layerGdpBars')}
+            </button>
+            <button onClick={toggleFlags} className={showFlags ? btnOn : btnOff}>
+              {t('layerFlags')}
+            </button>
+          </>
+        )}
         <button onClick={toggleAutoRotate} className={autoRotate ? btnOn : btnOff} title={t('hint')}>
           {autoRotate ? t('autoRotateOn') : t('autoRotateOff')}
         </button>

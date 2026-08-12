@@ -10,6 +10,7 @@ import { incomeGroupOf } from '../types'
 import type { Country } from '../types'
 import type { GdpEntry } from '../services/worldbank'
 import { formatUsd } from '../utils/format'
+import { PALEO_ERAS } from '../data/paleoEras'
 
 type CountryFeature = Feature<Geometry, { name?: string }>
 
@@ -48,6 +49,9 @@ export default function GlobeView() {
   const showGdpBars = useAppStore((s) => s.showGdpBars)
   const showFlags = useAppStore((s) => s.showFlags)
   const gdpAll = useAppStore((s) => s.gdpAll)
+  const timeTravel = useAppStore((s) => s.timeTravel)
+  const eraIndex = useAppStore((s) => s.eraIndex)
+  const featsRef = useRef<CountryFeature[]>([])
 
   const { i18n } = useTranslation()
 
@@ -155,7 +159,8 @@ export default function GlobeView() {
         const feats = (fc.features as CountryFeature[]).filter(
           (f) => f.properties?.name !== 'Antarctica',
         )
-        world.polygonsData(feats)
+        featsRef.current = feats
+        if (!useAppStore.getState().timeTravel) world.polygonsData(feats)
       })
       .catch((err) => console.error('加载国家边界失败', err))
 
@@ -202,7 +207,7 @@ export default function GlobeView() {
   useEffect(() => {
     const world = globeRef.current
     if (!world) return
-    if (!showGdpBars || !gdpAll) {
+    if (!showGdpBars || !gdpAll || timeTravel) {
       world.pointsData([])
       return
     }
@@ -229,14 +234,14 @@ export default function GlobeView() {
           <div style="font-size:12px;color:#7dd3fc">GDP: ${formatUsd(b.gdp, langRef.current)} (${b.gdpYear})</div>
         </div>`
       })
-  }, [showGdpBars, gdpAll, countries])
+  }, [showGdpBars, gdpAll, countries, timeTravel])
 
   // 国旗图层：以 HTML 元素贴在各国质心，尺寸随国家面积微调，可点击选中
   useEffect(() => {
     const world = globeRef.current
     if (!world) return
     world
-      .htmlElementsData(showFlags ? (countries as unknown as object[]) : [])
+      .htmlElementsData(showFlags && !timeTravel ? (countries as unknown as object[]) : [])
       .htmlLat((d) => (d as Country).latlng[0])
       .htmlLng((d) => (d as Country).latlng[1])
       .htmlAltitude(0.012)
@@ -255,7 +260,21 @@ export default function GlobeView() {
         return img
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showFlags, countries])
+  }, [showFlags, countries, timeTravel])
+
+  // 时间旅行：切换古地理贴图，隐藏国界（远古地球没有国家）
+  useEffect(() => {
+    const world = globeRef.current
+    if (!world) return
+    if (timeTravel) {
+      const era = PALEO_ERAS[eraIndex]
+      world.globeImageUrl(era.ma === 0 ? '/textures/earth-night.jpg' : `/paleo/${era.ma}.jpg`)
+      world.polygonsData([])
+    } else {
+      world.globeImageUrl('/textures/earth-night.jpg')
+      world.polygonsData(featsRef.current as object[])
+    }
+  }, [timeTravel, eraIndex])
 
   return <div ref={containerRef} className="absolute inset-0" />
 }
