@@ -251,37 +251,62 @@ export default function GlobeView() {
       })
   }, [showGdpBars, gdpAll, countries, timeTravel])
 
-  // 国旗图层：以 HTML 元素贴在各国质心，尺寸随国家面积微调，可点击选中
+  // HTML 标记图层：国旗（各国质心）+ 港口（航线开启时）。
+  // 港口不用 three-globe 的文字图层——其矢量字体无中文字形，会渲染成问号。
   useEffect(() => {
     const world = globeRef.current
     if (!world) return
+    type HtmlMarker = { kind: 'flag'; country: Country } | { kind: 'port'; port: Port }
+    const markers: HtmlMarker[] = []
+    if (!timeTravel && showFlags)
+      markers.push(...countries.map((c) => ({ kind: 'flag' as const, country: c })))
+    if (!timeTravel && showRoutes)
+      markers.push(...PORTS.map((p) => ({ kind: 'port' as const, port: p })))
+    const zh = langRef.current.startsWith('zh')
     world
-      .htmlElementsData(showFlags && !timeTravel ? (countries as unknown as object[]) : [])
-      .htmlLat((d) => (d as Country).latlng[0])
-      .htmlLng((d) => (d as Country).latlng[1])
+      .htmlElementsData(markers as unknown as object[])
+      .htmlLat((d) => {
+        const m = d as HtmlMarker
+        return m.kind === 'flag' ? m.country.latlng[0] : m.port.lat
+      })
+      .htmlLng((d) => {
+        const m = d as HtmlMarker
+        return m.kind === 'flag' ? m.country.latlng[1] : m.port.lng
+      })
       .htmlAltitude(0.012)
       .htmlElement((d) => {
-        const c = d as Country
-        const img = document.createElement('img')
-        img.src = `https://flagcdn.com/w40/${c.cca2.toLowerCase()}.png`
-        img.loading = 'lazy'
-        const w = Math.max(12, Math.min(26, Math.sqrt(c.area || 1) / 80))
-        img.style.width = `${w}px`
-        img.style.borderRadius = '2px'
-        img.style.border = '1px solid rgba(148,163,184,0.5)'
-        img.style.cursor = 'pointer'
-        img.style.pointerEvents = 'auto'
-        img.onclick = () => select(c)
-        return img
+        const m = d as HtmlMarker
+        if (m.kind === 'flag') {
+          const c = m.country
+          const img = document.createElement('img')
+          img.src = `https://flagcdn.com/w40/${c.cca2.toLowerCase()}.png`
+          img.loading = 'lazy'
+          const w = Math.max(12, Math.min(26, Math.sqrt(c.area || 1) / 80))
+          img.style.width = `${w}px`
+          img.style.borderRadius = '2px'
+          img.style.border = '1px solid rgba(148,163,184,0.5)'
+          img.style.cursor = 'pointer'
+          img.style.pointerEvents = 'auto'
+          img.onclick = () => select(c)
+          return img
+        }
+        // 港口：光点 + 中英文名（HTML 渲染，原生支持中文）
+        const el = document.createElement('div')
+        el.style.cssText = 'display:flex;flex-direction:column;align-items:center;pointer-events:none'
+        el.innerHTML = `
+          <span style="width:6px;height:6px;border-radius:50%;background:#38bdf8;box-shadow:0 0 6px #38bdf8"></span>
+          <span style="margin-top:2px;font-size:10px;font-family:system-ui;color:#bae6fd;
+            text-shadow:0 0 4px rgba(2,6,23,.9),0 0 2px rgba(2,6,23,.9);white-space:nowrap">
+            ${zh ? m.port.nameZh : m.port.nameEn}</span>`
+        return el
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showFlags, countries, timeTravel])
+  }, [showFlags, showRoutes, countries, timeTravel, i18n.language])
 
-  // 航线图层：主要海运通道按枢纽港分段的动画弧线 + 港口标记
+  // 航线图层：主要海运通道按枢纽港分段的动画弧线（港口标记在 HTML 图层中渲染）
   useEffect(() => {
     const world = globeRef.current
     if (!world) return
-    const zh = langRef.current.startsWith('zh')
     if (showRoutes && !timeTravel) {
       const portById = new Map(PORTS.map((p) => [p.id, p]))
       const arcs = ROUTE_LEGS.map((leg) => {
@@ -304,21 +329,10 @@ export default function GlobeView() {
         .arcDashLength(0.35)
         .arcDashGap(0.15)
         .arcDashAnimateTime(3000)
-      world
-        .labelsData(PORTS as unknown as object[])
-        .labelLat((d) => (d as Port).lat)
-        .labelLng((d) => (d as Port).lng)
-        .labelText((d) => (zh ? (d as Port).nameZh : (d as Port).nameEn))
-        .labelSize(0.7)
-        .labelDotRadius(0.28)
-        .labelColor(() => 'rgba(125,211,252,0.9)')
-        .labelResolution(2)
     } else {
       world.arcsData([])
-      world.labelsData([])
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showRoutes, timeTravel, i18n.language])
+  }, [showRoutes, timeTravel])
 
   /** 加载并预处理某时代贴图：解码 + sRGB + 预上传 GPU，避免切换瞬间卡顿 */
   const loadEraTexture = async (world: GlobeInstance, ma: number): Promise<Texture> => {
