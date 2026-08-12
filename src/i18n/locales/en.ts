@@ -11,6 +11,7 @@ export default {
     layerGdpBars: 'GDP bars',
     layerFlags: 'Flags',
     hint: 'Drag to rotate · Scroll to zoom · Click a country for details',
+    authorBlog: 'Blog',
 
     panel: {
       officialName: 'Official name',

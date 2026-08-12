@@ -46,6 +46,27 @@ export default function App() {
           {t('hint')}
         </p>
       )}
+
+      {/* 作者与开源链接 */}
+      <footer className="fixed bottom-4 left-4 z-10 flex items-center gap-3 text-xs text-slate-500">
+        <a
+          href="https://tanzhuo.xyz"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="transition hover:text-sky-300"
+        >
+          {t('authorBlog')}
+        </a>
+        <span className="text-slate-700">|</span>
+        <a
+          href="https://github.com/tan-zhuo/earth"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="transition hover:text-sky-300"
+        >
+          GitHub
+        </a>
+      </footer>
     </div>
   )
 }

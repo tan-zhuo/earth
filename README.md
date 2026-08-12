@@ -2,6 +2,8 @@
 
 类似 Google Earth 的纯前端 3D 地球应用：旋转 / 缩放地球，点击国家查看国旗、人口、GDP、政体等信息，支持中英文切换。
 
+作者：[tan-zhuo](https://github.com/tan-zhuo) · 博客：[tanzhuo.xyz](https://tanzhuo.xyz) · 开源地址：[github.com/tan-zhuo/earth](https://github.com/tan-zhuo/earth)
+
 ## 快速开始
 
 ```bash

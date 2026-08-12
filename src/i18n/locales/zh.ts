@@ -11,6 +11,7 @@ export default {
     layerGdpBars: 'GDP 柱状图',
     layerFlags: '国旗',
     hint: '拖动旋转 · 滚轮缩放 · 点击国家查看详情',
+    authorBlog: '作者博客',
 
     panel: {
       officialName: '官方全称',
