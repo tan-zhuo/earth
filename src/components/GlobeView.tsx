@@ -6,9 +6,17 @@ import type { Topology, GeometryCollection } from 'topojson-specification'
 import type { Feature, Geometry } from 'geojson'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/useAppStore'
+import { incomeGroupOf } from '../types'
 import type { Country } from '../types'
+import type { GdpEntry } from '../services/worldbank'
+import { formatUsd } from '../utils/format'
 
 type CountryFeature = Feature<Geometry, { name?: string }>
+
+/** GDP 柱状图的单条数据 */
+interface GdpBar extends GdpEntry {
+  country: Country
+}
 
 /** 根据国家面积估算合适的观察高度（globe.gl 的 altitude，单位为地球半径倍数） */
 function altitudeForArea(area: number): number {
@@ -16,6 +24,15 @@ function altitudeForArea(area: number): number {
 }
 
 const OVERVIEW_ALTITUDE = 2.5
+
+/** 柱子颜色按世界银行收入分组着色（与详情面板徽章一致） */
+const BAR_COLORS: Record<string, string> = {
+  high: 'rgba(52, 211, 153, 0.8)',
+  upperMiddle: 'rgba(56, 189, 248, 0.8)',
+  lowerMiddle: 'rgba(251, 191, 36, 0.8)',
+  low: 'rgba(251, 113, 133, 0.8)',
+}
+const BAR_COLOR_UNKNOWN = 'rgba(148, 163, 184, 0.7)'
 
 export default function GlobeView() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -27,6 +44,10 @@ export default function GlobeView() {
   const autoRotate = useAppStore((s) => s.autoRotate)
   const select = useAppStore((s) => s.select)
   const byCcn3 = useAppStore((s) => s.byCcn3)
+  const countries = useAppStore((s) => s.countries)
+  const showGdpBars = useAppStore((s) => s.showGdpBars)
+  const showFlags = useAppStore((s) => s.showFlags)
+  const gdpAll = useAppStore((s) => s.gdpAll)
 
   const { i18n } = useTranslation()
 
@@ -176,6 +197,65 @@ export default function GlobeView() {
     if (globeRef.current) applyStyles(globeRef.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i18n.language, byCcn3])
+
+  // GDP 柱状图层：高度 = sqrt(GDP) 归一化（兼顾大小国可见性），颜色按收入分组
+  useEffect(() => {
+    const world = globeRef.current
+    if (!world) return
+    if (!showGdpBars || !gdpAll) {
+      world.pointsData([])
+      return
+    }
+    const bars: GdpBar[] = countries
+      .filter((c) => gdpAll[c.cca3])
+      .map((c) => ({ country: c, ...gdpAll[c.cca3] }))
+    const maxSqrt = Math.max(...bars.map((b) => Math.sqrt(b.gdp)))
+    world
+      .pointsData(bars as unknown as object[])
+      .pointLat((d) => (d as GdpBar).country.latlng[0])
+      .pointLng((d) => (d as GdpBar).country.latlng[1])
+      .pointAltitude((d) => 0.015 + (Math.sqrt((d as GdpBar).gdp) / maxSqrt) * 0.55)
+      .pointRadius(0.45)
+      .pointColor((d) => {
+        const pc = (d as GdpBar).gdpPerCapita
+        return pc == null ? BAR_COLOR_UNKNOWN : BAR_COLORS[incomeGroupOf(pc)]
+      })
+      .pointLabel((d) => {
+        const b = d as GdpBar
+        const zh = langRef.current.startsWith('zh')
+        return `<div style="font-family:system-ui;padding:6px 10px;background:rgba(2,6,23,.85);
+          border:1px solid rgba(56,189,248,.4);border-radius:8px">
+          <div style="font-size:13px;font-weight:600;color:#e2e8f0">${zh ? b.country.nameZh : b.country.nameEn}</div>
+          <div style="font-size:12px;color:#7dd3fc">GDP: ${formatUsd(b.gdp, langRef.current)} (${b.gdpYear})</div>
+        </div>`
+      })
+  }, [showGdpBars, gdpAll, countries])
+
+  // 国旗图层：以 HTML 元素贴在各国质心，尺寸随国家面积微调，可点击选中
+  useEffect(() => {
+    const world = globeRef.current
+    if (!world) return
+    world
+      .htmlElementsData(showFlags ? (countries as unknown as object[]) : [])
+      .htmlLat((d) => (d as Country).latlng[0])
+      .htmlLng((d) => (d as Country).latlng[1])
+      .htmlAltitude(0.012)
+      .htmlElement((d) => {
+        const c = d as Country
+        const img = document.createElement('img')
+        img.src = `https://flagcdn.com/w40/${c.cca2.toLowerCase()}.png`
+        img.loading = 'lazy'
+        const w = Math.max(12, Math.min(26, Math.sqrt(c.area || 1) / 80))
+        img.style.width = `${w}px`
+        img.style.borderRadius = '2px'
+        img.style.border = '1px solid rgba(148,163,184,0.5)'
+        img.style.cursor = 'pointer'
+        img.style.pointerEvents = 'auto'
+        img.onclick = () => select(c)
+        return img
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showFlags, countries])
 
   return <div ref={containerRef} className="absolute inset-0" />
 }

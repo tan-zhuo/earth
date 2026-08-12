@@ -6,8 +6,10 @@ export default {
     loadError: 'Failed to load country data. Please check your network.',
     retry: 'Retry',
     backToGlobe: 'Back to globe',
-    autoRotateOn: 'Auto-rotate: on',
-    autoRotateOff: 'Auto-rotate: off',
+    autoRotateOn: 'Rotation: on',
+    autoRotateOff: 'Rotation: off',
+    layerGdpBars: 'GDP bars',
+    layerFlags: 'Flags',
     hint: 'Drag to rotate · Scroll to zoom · Click a country for details',
 
     panel: {

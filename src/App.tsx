@@ -3,11 +3,20 @@ import { useTranslation } from 'react-i18next'
 import GlobeView from './components/GlobeView'
 import Header from './components/Header'
 import InfoPanel from './components/InfoPanel'
+import { fetchAllGdp } from './services/worldbank'
 import { useAppStore } from './store/useAppStore'
 
 export default function App() {
   const { t, i18n } = useTranslation()
   const selected = useAppStore((s) => s.selected)
+  const setGdpAll = useAppStore((s) => s.setGdpAll)
+
+  // 启动时批量拉取全球 GDP（一次请求 + 30 天缓存），供 3D 柱状图使用
+  useEffect(() => {
+    fetchAllGdp()
+      .then(setGdpAll)
+      .catch((err) => console.error('全球 GDP 加载失败', err))
+  }, [setGdpAll])
 
   // SEO：标题、<html lang>、描述随语言和选中国家动态更新
   useEffect(() => {
