@@ -82,6 +82,66 @@ export async function fetchAllGdp(): Promise<Record<string, GdpEntry>> {
   return result
 }
 
+/* ---- 自然资源指标（单国按需，多指标一次请求） ---- */
+
+export interface ResourceStats {
+  /** 各类资源租金占 GDP %（衡量资源依赖度） */
+  totalRents: number | null
+  oilRents: number | null
+  gasRents: number | null
+  coalRents: number | null
+  mineralRents: number | null
+  forestRents: number | null
+  /** 土地与产出 */
+  arablePct: number | null
+  forestPct: number | null
+  /** 谷物产量（吨） */
+  cereal: number | null
+  /** 渔业产量（吨） */
+  fish: number | null
+  /** 可再生淡水资源（十亿立方米） */
+  freshwater: number | null
+}
+
+const RESOURCE_INDICATORS: Record<keyof ResourceStats, string> = {
+  totalRents: 'NY.GDP.TOTL.RT.ZS',
+  oilRents: 'NY.GDP.PETR.RT.ZS',
+  gasRents: 'NY.GDP.NGAS.RT.ZS',
+  coalRents: 'NY.GDP.COAL.RT.ZS',
+  mineralRents: 'NY.GDP.MINR.RT.ZS',
+  forestRents: 'NY.GDP.FRST.RT.ZS',
+  arablePct: 'AG.LND.ARBL.ZS',
+  forestPct: 'AG.LND.FRST.ZS',
+  cereal: 'AG.PRD.CREL.MT',
+  fish: 'ER.FSH.PROD.MT',
+  freshwater: 'ER.H2O.INTR.K3',
+}
+
+/** 获取单个国家的自然资源指标（11 个指标合并为一次请求），30 天缓存 */
+export async function fetchResourceStats(iso2: string): Promise<ResourceStats> {
+  const key = `earth:wb:res:${iso2}`
+  const cached = getCache<ResourceStats>(key, CACHE_TTL)
+  if (cached) return cached
+
+  const ids = Object.values(RESOURCE_INDICATORS).join(';')
+  // 多指标请求必须带 source 参数；mrv=8 容忍数据滞后
+  const url = `https://api.worldbank.org/v2/country/${iso2}/indicator/${ids}?source=2&format=json&mrv=8&per_page=200`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`World Bank 资源指标请求失败: ${res.status}`)
+  const json = (await res.json()) as [unknown, (WbRow & { indicator: { id: string } })[] | null]
+
+  // 每个指标取最近非空年份（行按指标分组、年份倒序）
+  const latest = new Map<string, number>()
+  for (const row of json?.[1] ?? []) {
+    if (row.value !== null && !latest.has(row.indicator.id)) latest.set(row.indicator.id, row.value)
+  }
+  const stats = Object.fromEntries(
+    Object.entries(RESOURCE_INDICATORS).map(([k, id]) => [k, latest.get(id) ?? null]),
+  ) as unknown as ResourceStats
+  setCache(key, stats)
+  return stats
+}
+
 /** 获取人口、名义 GDP、人均 GDP（美元现价），带 30 天本地缓存 */
 export async function fetchStats(iso2: string): Promise<WbStats> {
   const key = `earth:wb:${iso2}`

@@ -19,7 +19,8 @@ interface RawSummary {
 
 async function fetchSummary(lang: 'zh' | 'en', title: string): Promise<WikiSummary | null> {
   const url = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`
-  const res = await fetch(url)
+  // Accept-Language 触发中文维基的简体变体转换
+  const res = await fetch(url, lang === 'zh' ? { headers: { 'Accept-Language': 'zh-cn' } } : undefined)
   if (!res.ok) return null
   const json = (await res.json()) as RawSummary
   if (!json.extract || json.type === 'disambiguation') return null

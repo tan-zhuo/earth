@@ -2,10 +2,19 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/useAppStore'
-import { fetchStats } from '../services/worldbank'
+import { fetchStats, fetchResourceStats } from '../services/worldbank'
+import type { ResourceStats } from '../services/worldbank'
 import { fetchCountryHistory } from '../services/wikipedia'
 import type { WikiSummary } from '../services/wikipedia'
 import { countryExtras } from '../data/countryExtras'
+import factbookRaw from '../data/factbook.json'
+import { translateTerms } from '../utils/termsZh'
+
+/** CIA Factbook 精选字段（构建时生成，见 scripts/build-factbook.mjs） */
+const factbook = factbookRaw as Record<
+  string,
+  { res: string | null; agri: string | null; ind: string | null; expc: string | null }
+>
 import { incomeGroupOf } from '../types'
 import type { WbStats } from '../types'
 import { formatBigNumber, formatUsd, formatExact } from '../utils/format'
@@ -66,6 +75,7 @@ export default function InfoPanel() {
   const [statsLoading, setStatsLoading] = useState(false)
   const [history, setHistory] = useState<WikiSummary | null>(null)
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [resStats, setResStats] = useState<ResourceStats | null>(null)
 
   // 选中国家后按需拉取世界银行数据（人口 + GDP，带本地缓存）
   useEffect(() => {
@@ -77,6 +87,19 @@ export default function InfoPanel() {
       .then((s) => !cancelled && setStats(s))
       .catch(() => !cancelled && setStats(null))
       .finally(() => !cancelled && setStatsLoading(false))
+    return () => {
+      cancelled = true
+    }
+  }, [selected])
+
+  // 自然资源指标（World Bank，多指标一次请求，本地缓存）
+  useEffect(() => {
+    setResStats(null)
+    if (!selected) return
+    let cancelled = false
+    fetchResourceStats(selected.cca2)
+      .then((r) => !cancelled && setResStats(r))
+      .catch(() => !cancelled && setResStats(null))
     return () => {
       cancelled = true
     }
@@ -123,6 +146,28 @@ export default function InfoPanel() {
   ) : (
     t('panel.gdpUnavailable')
   )
+
+  // Factbook 清单（中文按术语词典翻译）
+  const fb = factbook[selected.cca3]
+  const fbText = (s: string | null | undefined) => (s ? (zh ? translateTerms(s) : s) : null)
+  const fbRes = fbText(fb?.res)
+  const fbAgri = fbText(fb?.agri)
+  const fbInd = fbText(fb?.ind)
+  const fbExpc = fbText(fb?.expc)
+
+  // 资源租金构成（只显示 >0.1% 的项）
+  const rentPairs: Array<[string, number | null]> = resStats
+    ? [
+        ['rentOil', resStats.oilRents],
+        ['rentGas', resStats.gasRents],
+        ['rentCoal', resStats.coalRents],
+        ['rentMineral', resStats.mineralRents],
+        ['rentForest', resStats.forestRents],
+      ]
+    : []
+  const rentItems = rentPairs.filter((x): x is [string, number] => x[1] != null && x[1] > 0.1)
+  const fmtPct = (v: number) => `${v.toFixed(v >= 10 ? 0 : 1)}%`
+  const fmtTons = (v: number) => `${formatBigNumber(v, lang)} ${t('panel.tons')}`
 
   return (
     <aside
@@ -238,6 +283,12 @@ export default function InfoPanel() {
               )
             }
           />
+          {fbExpc && (
+            <div className="mt-2 border-t border-slate-700/30 pt-2">
+              <p className="mb-1 text-xs text-slate-400">{t('panel.exportsCommodities')}</p>
+              <p className="text-sm leading-relaxed text-slate-300">{fbExpc}</p>
+            </div>
+          )}
           <p className="mt-1 text-[10px] text-slate-600">{t('panel.tradeNote')}</p>
           {income && (
             <span
@@ -246,6 +297,70 @@ export default function InfoPanel() {
               {t(`income.${income}`)}
             </span>
           )}
+        </Section>
+
+        <Section title={t('panel.resources')}>
+          {fbRes && (
+            <div className="mb-2">
+              <p className="mb-1 text-xs text-slate-400">{t('panel.naturalResources')}</p>
+              <p className="text-sm leading-relaxed text-slate-300">{fbRes}</p>
+            </div>
+          )}
+          {resStats?.totalRents != null && resStats.totalRents > 0.05 && (
+            <div className="mb-2">
+              <Row label={t('panel.resourceRents')} value={fmtPct(resStats.totalRents)} />
+              {rentItems.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {rentItems.map(([k, v]) => (
+                    <span
+                      key={k}
+                      className="rounded-full border border-slate-600/50 bg-slate-800/60 px-2 py-0.5 text-xs text-slate-300"
+                    >
+                      {t(`panel.${k}`)} {fmtPct(v)}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {resStats?.arablePct != null && (
+            <Row label={t('panel.arable')} value={fmtPct(resStats.arablePct)} />
+          )}
+          {resStats?.forestPct != null && (
+            <Row label={t('panel.forestCover')} value={fmtPct(resStats.forestPct)} />
+          )}
+          {resStats?.cereal != null && resStats.cereal > 0 && (
+            <Row label={t('panel.cereal')} value={fmtTons(resStats.cereal)} />
+          )}
+          {resStats?.fish != null && resStats.fish > 0 && (
+            <Row label={t('panel.fishery')} value={fmtTons(resStats.fish)} />
+          )}
+          {resStats?.freshwater != null && resStats.freshwater > 0 && (
+            <Row
+              label={t('panel.freshwater')}
+              value={
+                zh
+                  ? `${formatBigNumber(resStats.freshwater * 10, lang)} 亿立方米`
+                  : `${resStats.freshwater.toLocaleString('en-US', { maximumFractionDigits: 0 })} km³`
+              }
+            />
+          )}
+          {fbAgri && (
+            <div className="mt-2 border-t border-slate-700/30 pt-2">
+              <p className="mb-1 text-xs text-slate-400">{t('panel.agriProducts')}</p>
+              <p className="text-sm leading-relaxed text-slate-300">{fbAgri}</p>
+            </div>
+          )}
+          {fbInd && (
+            <div className="mt-2 border-t border-slate-700/30 pt-2">
+              <p className="mb-1 text-xs text-slate-400">{t('panel.industries')}</p>
+              <p className="text-sm leading-relaxed text-slate-300">{fbInd}</p>
+            </div>
+          )}
+          {!fbRes && !fbAgri && !fbInd && !resStats && (
+            <p className="animate-pulse py-1 text-sm text-slate-400">{t('loading')}</p>
+          )}
+          <p className="mt-2 text-[10px] text-slate-600">{t('panel.factbookNote')}</p>
         </Section>
 
         <Section title={t('panel.politics')}>
