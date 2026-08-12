@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import GlobeView from './components/GlobeView'
 import Header from './components/Header'
+import Sidebar from './components/Sidebar'
 import InfoPanel from './components/InfoPanel'
 import TimeTravelBar from './components/TimeTravelBar'
 import RankingPanel from './components/RankingPanel'
@@ -52,6 +53,7 @@ export default function App() {
       {view === 'universe' && <UniverseView />}
 
       <Header />
+      <Sidebar />
       {view === 'earth' && (
         <>
           <InfoPanel />

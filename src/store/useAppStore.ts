@@ -38,6 +38,8 @@ interface AppState {
   toggleRankings: () => void
   toggleRoutes: () => void
   setView: (v: SpaceView) => void
+  sidebarOpen: boolean
+  setSidebarOpen: (open: boolean) => void
 }
 
 // 国家数据是构建时静态化的，直接同步初始化
@@ -71,4 +73,6 @@ export const useAppStore = create<AppState>((set) => ({
   // 切换尺度视图：离开地球时收起地球相关面板与模式
   setView: (v) =>
     set({ view: v, selected: null, showRankings: false, timeTravel: false, eraIndex: 0 }),
+  sidebarOpen: false,
+  setSidebarOpen: (open) => set({ sidebarOpen: open }),
 }))
