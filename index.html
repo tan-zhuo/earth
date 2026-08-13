@@ -7,14 +7,14 @@
     <meta name="theme-color" content="#020617" />
 
     <!-- SEO 基础（部署后请把 earth-tan-zhuo.vercel.app 替换为实际域名） -->
-    <title>Earth · 3D 互动地球 | Interactive 3D World Atlas</title>
+    <title>Earth 3D 互动地球仪 - 世界地图·国家信息·GDP 排行 | Interactive 3D World Globe</title>
     <meta
       name="description"
-      content="免费的交互式 3D 地球：旋转缩放地球，点击任意国家查看国旗、首都、人口、GDP、政治体制等完整信息，支持中英文切换。Free interactive 3D globe: explore every country's flag, capital, population, GDP and government, in English and Chinese."
+      content="免费在线 3D 地球仪：旋转缩放地球，点击 250 个国家查看国旗、国歌、首都、人口、GDP 排名、政治体制、自然资源与历史；GDP 柱状图、海运航线、卫星星座图层；大陆漂移时间旅行；月球、火星、太阳系、银河系宇宙漫游。中英双语。Free interactive 3D globe with country facts, GDP rankings, anthems, plate tectonics time travel and a solar system tour."
     />
     <meta
       name="keywords"
-      content="3D地球,互动地图,世界地图,国家信息,GDP,国旗,3D globe, interactive world map, country facts, world atlas"
+      content="3D地球仪,在线地球仪,互动地图,世界地图,国家信息查询,GDP排行榜,国旗大全,国歌,大陆漂移,板块运动,太阳系模型,银河系,人造卫星,火星,月球,3D globe, interactive world map, country facts, GDP ranking, world atlas, solar system, plate tectonics"
     />
     <link rel="canonical" href="https://earth-tan-zhuo.vercel.app/" />
 
@@ -66,18 +66,68 @@
   </head>
   <body>
     <div id="root"></div>
-    <!-- 无 JS 时的可索引降级内容 -->
+
+    <!-- 静态可爬取内容：供不执行 JS 的搜索引擎（如百度）索引，用户不可见 -->
+    <section
+      style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)"
+      aria-hidden="true"
+    >
+      <h1>Earth 3D 互动地球仪 - 世界地图与国家信息 | Interactive 3D World Globe</h1>
+      <h2>功能 Features</h2>
+      <ul>
+        <li>250 个国家与地区：国旗、国歌播放、首都、人口、面积、语言、货币</li>
+        <li>经济数据：GDP 与全球排名、人均 GDP、进出口贸易额（世界银行实时数据）</li>
+        <li>全球排行榜：GDP、出口、进口、石油产量、天然气产量</li>
+        <li>自然资源：矿产、农产品、主要产业、资源租金占比、耕地与森林覆盖</li>
+        <li>政治体制与国家历史（维基百科摘要，中英双语）</li>
+        <li>3D 图层：GDP 柱状图、国旗、海运贸易航线、卫星星座（GPS、北斗、星链、国际空间站）</li>
+        <li>时间旅行：7.5 亿年大陆漂移演变（罗迪尼亚超大陆 → 盘古大陆 → 现代）</li>
+        <li>宇宙尺度：月球着陆点、火星内部结构与磁场、太阳系行星与拉格朗日点、银河系、可观测宇宙</li>
+        <li>地球内部构造剖面与地磁场可视化</li>
+      </ul>
+      <h2>热门国家 Popular Countries</h2>
+      <ul>
+        <li><a href="/country/chn">中国 China</a></li>
+        <li><a href="/country/usa">美国 United States</a></li>
+        <li><a href="/country/jpn">日本 Japan</a></li>
+        <li><a href="/country/deu">德国 Germany</a></li>
+        <li><a href="/country/gbr">英国 United Kingdom</a></li>
+        <li><a href="/country/fra">法国 France</a></li>
+        <li><a href="/country/ind">印度 India</a></li>
+        <li><a href="/country/rus">俄罗斯 Russia</a></li>
+        <li><a href="/country/bra">巴西 Brazil</a></li>
+        <li><a href="/country/kor">韩国 South Korea</a></li>
+        <li><a href="/country/ita">意大利 Italy</a></li>
+        <li><a href="/country/can">加拿大 Canada</a></li>
+        <li><a href="/country/aus">澳大利亚 Australia</a></li>
+        <li><a href="/country/esp">西班牙 Spain</a></li>
+        <li><a href="/country/mex">墨西哥 Mexico</a></li>
+        <li><a href="/country/idn">印度尼西亚 Indonesia</a></li>
+        <li><a href="/country/sau">沙特阿拉伯 Saudi Arabia</a></li>
+        <li><a href="/country/tur">土耳其 Türkiye</a></li>
+        <li><a href="/country/che">瑞士 Switzerland</a></li>
+        <li><a href="/country/sgp">新加坡 Singapore</a></li>
+        <li><a href="/country/egy">埃及 Egypt</a></li>
+        <li><a href="/country/zaf">南非 South Africa</a></li>
+        <li><a href="/country/arg">阿根廷 Argentina</a></li>
+        <li><a href="/country/tha">泰国 Thailand</a></li>
+      </ul>
+      <p>
+        免费在线 3D 地球仪，无需注册。数据来源：世界银行公开数据、CIA World Factbook、维基百科、Wikimedia
+        Commons。支持简体中文与英文。
+      </p>
+      <p>
+        A free interactive 3D globe. Click any of 250 countries for flags, anthems, capitals,
+        population, GDP rankings, trade, natural resources, government and history. Includes
+        continental drift time travel, satellite constellations, the Moon, Mars, the Solar System,
+        the Milky Way and the observable universe. Data from World Bank, CIA World Factbook and
+        Wikipedia.
+      </p>
+    </section>
+
+    <!-- 无 JS 时的可见降级提示 -->
     <noscript>
-      <h1>Earth · 3D 互动地球 | Interactive 3D World Atlas</h1>
-      <p>
-        交互式 3D 地球：旋转、缩放地球，点击任意国家查看国旗、首都、人口、GDP、政治体制等完整信息，支持中英文切换。本应用需要启用
-        JavaScript。
-      </p>
-      <p>
-        Interactive 3D globe: spin and zoom the Earth, click any country to see its flag, capital,
-        population, GDP and system of government, in English and Chinese. This app requires
-        JavaScript.
-      </p>
+      <p>本应用需要启用 JavaScript。This app requires JavaScript.</p>
     </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
