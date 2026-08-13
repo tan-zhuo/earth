@@ -179,7 +179,7 @@ export default function GlobeView() {
       const s = useAppStore.getState()
       if (s.view !== 'earth' || s.timeTravel) return
       if (performance.now() - enteredEarthAtRef.current < 1200) return
-      if (pov.altitude > 4.2) s.setView('solar')
+      if (pov.altitude > 8) s.setView('solar')
     })
 
     // 加载国家边界（world-atlas TopoJSON → GeoJSON），剔除南极洲
@@ -558,7 +558,7 @@ export default function GlobeView() {
       }
       // 从太阳系缩放回来时视角还在穿越阈值之外，立即拉回总览高度避免再次触发
       const pov = world.pointOfView()
-      if (!Number.isFinite(pov.altitude) || pov.altitude > 3.5) {
+      if (!Number.isFinite(pov.altitude) || pov.altitude > 6) {
         world.pointOfView({ lat: 25, lng: 105, altitude: OVERVIEW_ALTITUDE }, 0)
       }
     } else {

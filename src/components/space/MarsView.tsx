@@ -37,14 +37,16 @@ function MarsSurface() {
     const mountedAt = performance.now()
     world.onZoom((pov) => {
       if (performance.now() - mountedAt < 1200) return
-      if (pov.altitude > 4.2) useAppStore.getState().setView('solar')
+      if (pov.altitude > 6) useAppStore.getState().setView('solar')
     })
 
     const ro = new ResizeObserver(() => world.width(el.clientWidth).height(el.clientHeight))
     ro.observe(el)
     return () => {
       ro.disconnect()
+      const renderer = world.renderer()
       world._destructor()
+      renderer.forceContextLoss() // 立即释放 WebGL 上下文
       globeRef.current = null
     }
   }, [])

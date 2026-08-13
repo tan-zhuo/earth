@@ -78,6 +78,21 @@ export default function SolarSystemView() {
       t.colorSpace = SRGBColorSpace
       return t
     }
+    /** 贴图异步加载期间先用近似底色渲染，避免天体黑屏闪烁 */
+    const texturedPhong = (url: string, baseColor: number) => {
+      const mat = new MeshPhongMaterial({ color: baseColor, shininess: 8 })
+      loader.load(url, (t) => {
+        t.colorSpace = SRGBColorSpace
+        mat.map = t
+        mat.color.set(0xffffff)
+        mat.needsUpdate = true
+      })
+      return mat
+    }
+    const PLANET_BASE_COLORS: Record<string, number> = {
+      mercury: 0x9c8e82, venus: 0xd9b27c, earth: 0x4a6fa5, mars: 0xb35a3c,
+      jupiter: 0xc8a97e, saturn: 0xd8c393, uranus: 0x9fd4d9, neptune: 0x4f6fd8,
+    }
 
     // 星空背景天球
     const sky = new Mesh(
@@ -86,8 +101,15 @@ export default function SolarSystemView() {
     )
     scene.add(sky)
 
-    // 太阳 + 光晕
-    const sun = new Mesh(new SphereGeometry(16, 64, 64), new MeshBasicMaterial({ map: loadTex('/space/sun.jpg') }))
+    // 太阳 + 光晕（贴图未就绪前用橙色底色）
+    const sunMat = new MeshBasicMaterial({ color: 0xffa030 })
+    loader.load('/space/sun.jpg', (t) => {
+      t.colorSpace = SRGBColorSpace
+      sunMat.map = t
+      sunMat.color.set(0xffffff)
+      sunMat.needsUpdate = true
+    })
+    const sun = new Mesh(new SphereGeometry(16, 64, 64), sunMat)
     sun.userData.id = 'sun'
     scene.add(sun)
     const glow = new Sprite(new SpriteMaterial({ map: makeGlowTexture(), transparent: true, depthWrite: false }))
@@ -102,7 +124,7 @@ export default function SolarSystemView() {
       scene.add(group)
       const mesh = new Mesh(
         new SphereGeometry(p.vRadius, 48, 48),
-        new MeshPhongMaterial({ map: loadTex(p.texture), shininess: 8 }),
+        texturedPhong(p.texture, PLANET_BASE_COLORS[p.id] ?? 0x888888),
       )
       mesh.userData.id = p.id
       mesh.position.x = p.vDist
@@ -304,6 +326,7 @@ export default function SolarSystemView() {
       controls.removeEventListener('change', onScaleCross)
       renderer.domElement.removeEventListener('click', onClick)
       renderer.dispose()
+      renderer.forceContextLoss() // 立即释放 WebGL 上下文，防止超限导致其他视图黑屏
       el.removeChild(renderer.domElement)
       labelEls.forEach((s) => s.remove())
     }

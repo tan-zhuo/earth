@@ -142,6 +142,7 @@ export default function GalaxyView() {
       ro.disconnect()
       controls.removeEventListener('change', onScaleCross)
       renderer.dispose()
+      renderer.forceContextLoss() // 立即释放 WebGL 上下文
       el.removeChild(renderer.domElement)
       sunLabel.remove()
       coreLabel.remove()

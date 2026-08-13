@@ -161,6 +161,7 @@ export default function UniverseView() {
       ro.disconnect()
       controls.removeEventListener('change', onScaleCross)
       renderer.dispose()
+      renderer.forceContextLoss() // 立即释放 WebGL 上下文
       el.removeChild(renderer.domElement)
       labels.forEach((l) => l.span.remove())
     }

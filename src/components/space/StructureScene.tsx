@@ -207,6 +207,7 @@ export default function StructureScene({
       cancelAnimationFrame(raf)
       ro.disconnect()
       renderer.dispose()
+      renderer.forceContextLoss() // 立即释放 WebGL 上下文
       el.removeChild(renderer.domElement)
       labelDefs.forEach((l) => l.span.remove())
     }
