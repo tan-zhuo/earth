@@ -28,9 +28,10 @@ export default function Header() {
             <path d="M2 4h12M2 8h12M2 12h12" />
           </svg>
         </button>
-        <h1 className="text-xl font-bold tracking-wide text-slate-100">
+        <h1 className="flex items-center gap-2 text-xl font-bold tracking-wide text-slate-100">
+          <img src="/logo.svg" alt="Earth logo" className="h-8 w-8" />
           {t('appTitle')}
-          <span className="ml-2 hidden text-xs font-normal text-slate-400 sm:inline">
+          <span className="hidden text-xs font-normal text-slate-400 sm:inline">
             {t(`views.${view}`)}
           </span>
         </h1>

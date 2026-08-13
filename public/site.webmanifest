@@ -1,0 +1,13 @@
+{
+  "name": "Earth · 3D 互动地球",
+  "short_name": "Earth",
+  "description": "交互式 3D 地球：国家信息、GDP 排行、大陆漂移、太阳系与宇宙漫游",
+  "icons": [
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ],
+  "theme_color": "#020617",
+  "background_color": "#020617",
+  "display": "standalone",
+  "start_url": "/"
+}

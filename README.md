@@ -1,3 +1,5 @@
+<img src="public/logo.svg" width="72" alt="Earth logo" />
+
 # Earth · 交互式 3D 地球
 
 类似 Google Earth 的纯前端 3D 地球应用：旋转 / 缩放地球，点击国家查看国旗、人口、GDP、政体等信息，支持中英文切换。

@@ -98,7 +98,10 @@ export default function Sidebar() {
         }`}
       >
         <div className="flex items-center justify-between border-b border-slate-700/40 px-4 py-3">
-          <h2 className="text-sm font-bold tracking-wide text-slate-100">{t('menu')}</h2>
+          <h2 className="flex items-center gap-2 text-sm font-bold tracking-wide text-slate-100">
+            <img src="/logo.svg" alt="" className="h-5 w-5" />
+            {t('menu')}
+          </h2>
           <button
             onClick={() => setSidebarOpen(false)}
             className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-700/50 hover:text-slate-100"
