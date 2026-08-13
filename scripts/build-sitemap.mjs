@@ -7,7 +7,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const SITE = 'https://earth-tan-zhuo.vercel.app' // 部署后改这里
+const SITE = 'https://www.earth.kim' // 部署后改这里
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const countries = JSON.parse(await readFile(resolve(ROOT, 'src/data/countries.json'), 'utf8'))

@@ -103,7 +103,7 @@ earth/
 
 已接入 **Vercel Analytics**（访问量）与 **Speed Insights**（Core Web Vitals），部署后在 Vercel 项目的 Analytics / Speed Insights 标签页启用即可看到数据（免费额度够用），本地开发不上报。
 
-> 部署后把 `index.html`、`public/robots.txt`、`public/sitemap.xml` 中的占位域名 `earth-tan-zhuo.vercel.app` 替换为实际分配的域名。
+> 线上地址：[www.earth.kim](https://www.earth.kim)。域名变更时需同步修改：`src/seo.ts`、`index.html`、`public/robots.txt`、`scripts/build-sitemap.mjs`（改后重跑生成 sitemap）。
 
 ## SEO
 
