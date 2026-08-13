@@ -1,21 +1,22 @@
 import { useEffect, useRef } from 'react'
 import {
-  AdditiveBlending, BufferGeometry, Color, Float32BufferAttribute, PerspectiveCamera,
-  Points, PointsMaterial, Scene, Vector3, WebGLRenderer,
+  AdditiveBlending, BufferGeometry, Color, Float32BufferAttribute, Group, NormalBlending,
+  PerspectiveCamera, Points, PointsMaterial, Scene, Sprite, SpriteMaterial, Vector3, WebGLRenderer,
 } from 'three'
+import type { Blending } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { useTranslation } from 'react-i18next'
 import { GALAXY_FACTS } from '../../data/space'
 import { useAppStore } from '../../store/useAppStore'
+import { makeStarTexture, makeGlowTexture } from '../../utils/spriteTextures'
 import FactCard from './FactCard'
 
-const STAR_COUNT = 42000
-const BULGE_COUNT = 8000
 const RADIUS = 70
 const ARMS = 4
 const SPIN = 0.055
+const BAR_ANGLE = 0.45 // 中心棒的方位角
 
-/** 银河系视图：程序化棒旋星系粒子 + 太阳位置标记 */
+/** 银河系视图：多层恒星群 + 棒旋核球 + HII 星云 + 星团 + 尘埃带 */
 export default function GalaxyView() {
   const containerRef = useRef<HTMLDivElement>(null)
   const labelsRef = useRef<HTMLDivElement>(null)
@@ -55,45 +56,177 @@ export default function GalaxyView() {
     }
     controls.addEventListener('change', onScaleCross)
 
-    // 旋臂星场
-    const positions = new Float32Array((STAR_COUNT + BULGE_COUNT) * 3)
-    const colors = new Float32Array((STAR_COUNT + BULGE_COUNT) * 3)
-    const core = new Color('#ffe3b3')
-    const mid = new Color('#a8cdff')
-    const edge = new Color('#5d7fd6')
+    const galaxy = new Group()
+    scene.add(galaxy)
+
+    const starTex = makeStarTexture()
     const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5
 
-    for (let i = 0; i < STAR_COUNT; i++) {
-      const r = Math.pow(Math.random(), 0.72) * RADIUS
-      const arm = i % ARMS
-      const angle = (arm / ARMS) * Math.PI * 2 + r * SPIN + gauss() * 0.28
-      const fan = 1 - (r / RADIUS) * 0.55
-      const x = Math.cos(angle) * r + gauss() * 2.6 * fan
-      const z = Math.sin(angle) * r + gauss() * 2.6 * fan
-      const y = gauss() * 1.5 * fan
-      positions.set([x, y, z], i * 3)
-      const c = r < RADIUS * 0.25 ? core.clone().lerp(mid, r / (RADIUS * 0.25)) : mid.clone().lerp(edge, (r - RADIUS * 0.25) / (RADIUS * 0.75))
-      colors.set([c.r, c.g, c.b], i * 3)
-    }
-    // 中心核球
-    for (let i = 0; i < BULGE_COUNT; i++) {
-      const idx = (STAR_COUNT + i) * 3
-      positions.set([gauss() * 7, gauss() * 3.5, gauss() * 7], idx)
-      colors.set([core.r, core.g, core.b], idx)
+    const addPoints = (
+      positions: number[], colors: number[], size: number, opacity: number,
+      blending: Blending = AdditiveBlending, renderOrder = 0,
+    ) => {
+      const geo = new BufferGeometry()
+      geo.setAttribute('position', new Float32BufferAttribute(positions, 3))
+      geo.setAttribute('color', new Float32BufferAttribute(colors, 3))
+      const pts = new Points(
+        geo,
+        new PointsMaterial({
+          size, sizeAttenuation: true, map: starTex, vertexColors: true,
+          blending, depthWrite: false, transparent: true, opacity,
+        }),
+      )
+      pts.renderOrder = renderOrder
+      galaxy.add(pts)
+      return pts
     }
 
-    const geo = new BufferGeometry()
-    geo.setAttribute('position', new Float32BufferAttribute(positions, 3))
-    geo.setAttribute('color', new Float32BufferAttribute(colors, 3))
-    const stars = new Points(
-      geo,
-      new PointsMaterial({ size: 0.28, sizeAttenuation: true, vertexColors: true, blending: AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.9 }),
-    )
-    scene.add(stars)
+    /** 旋臂上的一个点（armBias 沿臂法向偏移，用于尘埃带） */
+    const armPoint = (rPow: number, spread: number, armBias = 0) => {
+      const r = Math.pow(Math.random(), rPow) * RADIUS
+      const arm = Math.floor(Math.random() * ARMS)
+      // 两条主臂更密：奇数臂 40% 概率丢给主臂
+      const density = arm % 2 === 1 && Math.random() < 0.4 ? arm - 1 : arm
+      const angle = (density / ARMS) * Math.PI * 2 + r * SPIN + armBias + gauss() * spread * (1 - (r / RADIUS) * 0.5)
+      const fan = 1 - (r / RADIUS) * 0.55
+      return {
+        r,
+        x: Math.cos(angle) * r + gauss() * 2.2 * fan,
+        y: gauss() * 1.4 * fan,
+        z: Math.sin(angle) * r + gauss() * 2.2 * fan,
+      }
+    }
+
+    const cCore = new Color('#ffe3b3')
+    const cMid = new Color('#aecdff')
+    const cEdge = new Color('#6080d8')
+    const cRed = new Color('#ffab7a')
+    const cBlue = new Color('#c4d6ff')
+    const mixByRadius = (r: number) =>
+      r < RADIUS * 0.25
+        ? cCore.clone().lerp(cMid, r / (RADIUS * 0.25))
+        : cMid.clone().lerp(cEdge, (r - RADIUS * 0.25) / (RADIUS * 0.75))
+
+    // 1) 盘面暗星（数量大、颗粒细，铺出星场底色）
+    {
+      const pos: number[] = []
+      const col: number[] = []
+      for (let i = 0; i < 30000; i++) {
+        const p = armPoint(0.72, 0.3)
+        pos.push(p.x, p.y, p.z)
+        // 8% 红巨星、6% 蓝白亮星，其余按半径渐变
+        const c = Math.random() < 0.08 ? cRed : Math.random() < 0.065 ? cBlue : mixByRadius(p.r)
+        col.push(c.r, c.g, c.b)
+      }
+      addPoints(pos, col, 0.35, 0.6)
+    }
+
+    // 2) 旋臂亮星（大颗粒、偏蓝白，勾勒臂形）
+    {
+      const pos: number[] = []
+      const col: number[] = []
+      for (let i = 0; i < 7000; i++) {
+        const p = armPoint(0.6, 0.12)
+        pos.push(p.x, p.y, p.z)
+        const c = cBlue.clone().lerp(cMid, Math.random() * 0.6)
+        col.push(c.r, c.g, c.b)
+      }
+      addPoints(pos, col, 0.8, 0.85)
+    }
+
+    // 3) 棒旋核球（沿 BAR_ANGLE 拉长的暖色椭球）
+    {
+      const pos: number[] = []
+      const col: number[] = []
+      const cosB = Math.cos(BAR_ANGLE)
+      const sinB = Math.sin(BAR_ANGLE)
+      for (let i = 0; i < 9000; i++) {
+        const bx = gauss() * 9.5
+        const bz = gauss() * 3.6
+        const by = gauss() * 2.8
+        pos.push(bx * cosB - bz * sinB, by, bx * sinB + bz * cosB)
+        const c = cCore.clone().lerp(new Color('#ffd28a'), Math.random() * 0.5)
+        col.push(c.r, c.g, c.b)
+      }
+      addPoints(pos, col, 0.5, 0.85)
+    }
+
+    // 4) HII 恒星形成区（旋臂上的粉色星云斑）
+    {
+      const pos: number[] = []
+      const col: number[] = []
+      const cPink = new Color('#ff87b8')
+      for (let i = 0; i < 320; i++) {
+        const p = armPoint(0.55, 0.08)
+        if (p.r < 12) continue
+        pos.push(p.x, p.y, p.z)
+        col.push(cPink.r, cPink.g, cPink.b)
+      }
+      addPoints(pos, col, 4.2, 0.16)
+    }
+
+    // 5) 疏散星团（旋臂内的蓝白色致密星群）
+    {
+      const pos: number[] = []
+      const col: number[] = []
+      for (let i = 0; i < 70; i++) {
+        const c0 = armPoint(0.55, 0.1)
+        if (c0.r < 10) continue
+        const n = 12 + Math.floor(Math.random() * 9)
+        for (let j = 0; j < n; j++) {
+          pos.push(c0.x + gauss() * 0.8, c0.y + gauss() * 0.5, c0.z + gauss() * 0.8)
+          const c = cBlue.clone().lerp(new Color('#ffffff'), Math.random() * 0.5)
+          col.push(c.r, c.g, c.b)
+        }
+      }
+      addPoints(pos, col, 0.55, 0.95)
+    }
+
+    // 6) 球状星团（银晕中的古老暖色星团，分布在盘面上下）
+    {
+      const pos: number[] = []
+      const col: number[] = []
+      const cGlob = new Color('#ffdca8')
+      for (let i = 0; i < 45; i++) {
+        const dir = new Vector3(gauss(), gauss() * 1.6, gauss())
+        if (dir.length() === 0) continue
+        dir.normalize().multiplyScalar(16 + Math.random() * 42)
+        const n = 18 + Math.floor(Math.random() * 12)
+        for (let j = 0; j < n; j++) {
+          pos.push(dir.x + gauss() * 1.1, dir.y + gauss() * 1.1, dir.z + gauss() * 1.1)
+          col.push(cGlob.r, cGlob.g, cGlob.b)
+        }
+      }
+      addPoints(pos, col, 0.4, 0.8)
+    }
+
+    // 7) 尘埃带（旋臂内缘的暗色遮挡颗粒，普通混合以压暗背后星光）
+    {
+      const pos: number[] = []
+      const col: number[] = []
+      const cDust = new Color('#0d0805')
+      for (let i = 0; i < 9000; i++) {
+        const p = armPoint(0.6, 0.09, -0.055)
+        if (p.r < 8) continue
+        pos.push(p.x, p.y * 0.7, p.z)
+        col.push(cDust.r, cDust.g, cDust.b)
+      }
+      addPoints(pos, col, 1.0, 0.4, NormalBlending, 2)
+    }
+
+    // 8) 银心光晕（大范围暖色辉光 + 明亮核心）
+    const haloMat = new SpriteMaterial({ map: makeGlowTexture(255, 214, 156), transparent: true, opacity: 0.55, depthWrite: false })
+    const halo = new Sprite(haloMat)
+    halo.scale.setScalar(34)
+    galaxy.add(halo)
+    const coreMat = new SpriteMaterial({ map: makeGlowTexture(255, 240, 214), transparent: true, opacity: 0.9, depthWrite: false })
+    const core = new Sprite(coreMat)
+    core.scale.setScalar(9)
+    galaxy.add(core)
 
     // 标签：银心（人马座 A*）与太阳系位置（猎户臂，约半径 52%）
     const sunR = RADIUS * 0.52
-    const sunAngle = (0 / ARMS) * Math.PI * 2 + sunR * SPIN
+    const sunAngle = sunR * SPIN
     const sunPos = new Vector3(Math.cos(sunAngle) * sunR, 0.5, Math.sin(sunAngle) * sunR)
 
     const mkLabel = (text: string, color: string) => {
@@ -109,7 +242,7 @@ export default function GalaxyView() {
     const coreLabel = mkLabel(zh ? '人马座 A*（黑洞）' : 'Sagittarius A* (black hole)', '#f472b6')
 
     const project = (span: HTMLSpanElement, world: Vector3) => {
-      const v = world.clone().applyMatrix4(stars.matrixWorld).project(camera)
+      const v = world.clone().applyMatrix4(galaxy.matrixWorld).project(camera)
       const visible = v.z < 1
       span.style.display = visible ? 'block' : 'none'
       if (visible) {
@@ -120,8 +253,8 @@ export default function GalaxyView() {
 
     let raf = 0
     const tick = () => {
-      stars.rotation.y += 0.00045
-      stars.updateMatrixWorld()
+      galaxy.rotation.y += 0.00045
+      galaxy.updateMatrixWorld()
       project(sunLabel, sunPos)
       project(coreLabel, new Vector3(0, 0, 0))
       controls.update()

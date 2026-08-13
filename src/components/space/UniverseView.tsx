@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react'
 import {
-  AdditiveBlending, BufferGeometry, Color, Float32BufferAttribute, PerspectiveCamera,
-  Points, PointsMaterial, Scene, Vector3, WebGLRenderer,
+  AdditiveBlending, BufferGeometry, Color, Float32BufferAttribute, Group, PerspectiveCamera,
+  Points, PointsMaterial, Scene, Sprite, SpriteMaterial, Vector3, WebGLRenderer,
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { useTranslation } from 'react-i18next'
 import { UNIVERSE_FACTS } from '../../data/space'
 import { useAppStore } from '../../store/useAppStore'
+import { makeStarTexture, makeGlowTexture, makeSpiralTexture } from '../../utils/spriteTextures'
 import FactCard from './FactCard'
 
 const CLUSTERS = 130
@@ -25,7 +26,7 @@ const LANDMARKS: { nameZh: string; nameEn: string; pos: [number, number, number]
   { nameZh: '牧夫座空洞', nameEn: 'Boötes Void', pos: [26, 22, -48], color: '#64748b' },
 ]
 
-/** 可观测宇宙视图：宇宙网（星系团 + 纤维结构）点云，每个点代表一个星系 */
+/** 可观测宇宙视图：宇宙网——星系团核心（暖色椭圆星系）+ 纤维（蓝白旋涡星系）+ 空洞 */
 export default function UniverseView() {
   const containerRef = useRef<HTMLDivElement>(null)
   const labelsRef = useRef<HTMLDivElement>(null)
@@ -61,7 +62,26 @@ export default function UniverseView() {
     }
     controls.addEventListener('change', onScaleCross)
 
+    const web = new Group()
+    scene.add(web)
+
+    const starTex = makeStarTexture()
     const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5
+
+    const addPoints = (positions: number[], colors: number[], size: number, opacity: number) => {
+      const geo = new BufferGeometry()
+      geo.setAttribute('position', new Float32BufferAttribute(positions, 3))
+      geo.setAttribute('color', new Float32BufferAttribute(colors, 3))
+      web.add(
+        new Points(
+          geo,
+          new PointsMaterial({
+            size, sizeAttenuation: true, map: starTex, vertexColors: true,
+            blending: AdditiveBlending, depthWrite: false, transparent: true, opacity,
+          }),
+        ),
+      )
+    }
 
     // 星系团中心（球内均匀采样）
     const centers: Vector3[] = []
@@ -72,45 +92,92 @@ export default function UniverseView() {
       centers.push(v)
     }
 
-    const pts: number[] = []
-    const cols: number[] = []
-    const cWhite = new Color('#dbeafe')
-    const cBlue = new Color('#93b4f8')
-    const cWarm = new Color('#f5d9a8')
-    const push = (v: Vector3, c: Color, jitter = 1) => {
-      pts.push(v.x + gauss() * jitter, v.y + gauss() * jitter, v.z + gauss() * jitter)
-      cols.push(c.r, c.g, c.b)
+    const cElliptical = new Color('#ffd9a8') // 团核心的老年椭圆星系：暖黄
+    const cSpiral = new Color('#c9dcff') // 纤维与外围的旋涡星系：蓝白
+    const cFaint = new Color('#8aa4e8') // 远处暗弱星系
+    const jitterColor = (c: Color, amt: number) =>
+      c.clone().offsetHSL((Math.random() - 0.5) * 0.03, 0, (Math.random() - 0.5) * amt)
+
+    // 1) 团核心：致密的暖色椭圆星系（大而亮）
+    {
+      const pos: number[] = []
+      const col: number[] = []
+      for (const c0 of centers) {
+        const n = 16 + Math.floor(Math.random() * 26)
+        for (let i = 0; i < n; i++) {
+          pos.push(c0.x + gauss() * 2.4, c0.y + gauss() * 2.4, c0.z + gauss() * 2.4)
+          const c = jitterColor(cElliptical, 0.25)
+          col.push(c.r, c.g, c.b)
+        }
+      }
+      addPoints(pos, col, 1.5, 0.9)
     }
 
-    // 团块
-    for (const c of centers) {
-      const n = 50 + Math.floor(Math.random() * 110)
-      const col = Math.random() < 0.25 ? cWarm : Math.random() < 0.5 ? cWhite : cBlue
-      for (let i = 0; i < n; i++) push(c, col, 4.5)
-    }
-    // 纤维：连接每个团与其最近的两个团
-    for (const c of centers) {
-      const nearest = centers
-        .filter((o) => o !== c)
-        .sort((a, b) => a.distanceTo(c) - b.distanceTo(c))
-        .slice(0, 2)
-      for (const n of nearest) {
-        const steps = 26
-        for (let i = 1; i < steps; i++) {
-          const v = c.clone().lerp(n, i / steps)
-          push(v, cBlue, 2.2)
+    // 2) 团外围：蓝白旋涡星系（中等大小）
+    {
+      const pos: number[] = []
+      const col: number[] = []
+      for (const c0 of centers) {
+        const n = 34 + Math.floor(Math.random() * 60)
+        for (let i = 0; i < n; i++) {
+          pos.push(c0.x + gauss() * 5.2, c0.y + gauss() * 5.2, c0.z + gauss() * 5.2)
+          const c = jitterColor(Math.random() < 0.7 ? cSpiral : cFaint, 0.3)
+          col.push(c.r, c.g, c.b)
         }
+      }
+      addPoints(pos, col, 0.85, 0.8)
+    }
+
+    // 3) 纤维：连接最近的两个团（暗弱蓝色星系串）
+    {
+      const pos: number[] = []
+      const col: number[] = []
+      for (const c0 of centers) {
+        const nearest = centers
+          .filter((o) => o !== c0)
+          .sort((a, b) => a.distanceTo(c0) - b.distanceTo(c0))
+          .slice(0, 2)
+        for (const n of nearest) {
+          const steps = 26
+          for (let i = 1; i < steps; i++) {
+            const v = c0.clone().lerp(n, i / steps)
+            pos.push(v.x + gauss() * 2.0, v.y + gauss() * 2.0, v.z + gauss() * 2.0)
+            const c = jitterColor(Math.random() < 0.6 ? cFaint : cSpiral, 0.35)
+            col.push(c.r, c.g, c.b)
+          }
+        }
+      }
+      addPoints(pos, col, 0.55, 0.6)
+    }
+
+    // 4) 每个团中心一个"最亮团星系"（cD 星系辉光）
+    {
+      const cdTex = makeGlowTexture(255, 226, 180)
+      for (const c0 of centers) {
+        const s = new Sprite(new SpriteMaterial({ map: cdTex, transparent: true, opacity: 0.7, depthWrite: false }))
+        s.position.copy(c0)
+        s.scale.setScalar(2.6 + Math.random() * 2.4)
+        web.add(s)
       }
     }
 
-    const geo = new BufferGeometry()
-    geo.setAttribute('position', new Float32BufferAttribute(pts, 3))
-    geo.setAttribute('color', new Float32BufferAttribute(cols, 3))
-    const web = new Points(
-      geo,
-      new PointsMaterial({ size: 0.55, sizeAttenuation: true, vertexColors: true, blending: AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.75 }),
-    )
-    scene.add(web)
+    // 5) 近处的"实体"旋涡星系：仙女座 M31 与三角座 M33（与标注对应）
+    {
+      const spiralTex = makeSpiralTexture()
+      const m31 = new Sprite(new SpriteMaterial({ map: spiralTex, transparent: true, opacity: 0.95, depthWrite: false, rotation: 0.5 }))
+      m31.position.set(5, 1.5, 3)
+      m31.scale.set(7, 4.2, 1)
+      web.add(m31)
+      const m33 = new Sprite(new SpriteMaterial({ map: spiralTex, transparent: true, opacity: 0.8, depthWrite: false, rotation: -0.9 }))
+      m33.position.set(-4, -1, 5)
+      m33.scale.set(4, 2.6, 1)
+      web.add(m33)
+      // 银河系自己也是一个旋涡
+      const mw = new Sprite(new SpriteMaterial({ map: spiralTex, transparent: true, opacity: 0.95, depthWrite: false, rotation: 1.2 }))
+      mw.position.set(0, 0, 0)
+      mw.scale.set(6, 3.8, 1)
+      web.add(mw)
+    }
 
     // 标注：银河系 + 著名星系与大尺度结构
     const mkLabel = (text: string, color: string, size = 12) => {
