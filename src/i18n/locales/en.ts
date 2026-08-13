@@ -52,6 +52,9 @@ export default {
     panel: {
       officialName: 'Official name',
       basics: 'Basic facts',
+      anthem: 'National Anthem',
+      anthemNoAudio: 'No free audio available',
+      anthemSource: 'Audio from Wikimedia Commons (public domain / free license)',
       capital: 'Capital',
       region: 'Region',
       area: 'Area',

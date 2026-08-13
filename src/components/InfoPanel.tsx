@@ -8,7 +8,14 @@ import { fetchCountryHistory } from '../services/wikipedia'
 import type { WikiSummary } from '../services/wikipedia'
 import { countryExtras } from '../data/countryExtras'
 import factbookRaw from '../data/factbook.json'
+import anthemsRaw from '../data/anthems.json'
 import { translateTerms } from '../utils/termsZh'
+
+/** 各国国歌（构建时由 Wikidata 生成，音频托管于 Wikimedia Commons） */
+const anthems = anthemsRaw as Record<
+  string,
+  { nameEn: string | null; nameZh: string | null; audio: string | null }
+>
 
 /** CIA Factbook 精选字段（构建时生成，见 scripts/build-factbook.mjs） */
 const factbook = factbookRaw as Record<
@@ -198,6 +205,30 @@ export default function InfoPanel() {
       </div>
 
       <div className="space-y-3 p-4">
+        {(() => {
+          const anthem = anthems[selected.cca3]
+          if (!anthem || (!anthem.nameEn && !anthem.nameZh)) return null
+          return (
+            <Section title={t('panel.anthem')}>
+              <p className="text-sm font-medium text-slate-200">
+                {zh ? (anthem.nameZh ?? anthem.nameEn) : (anthem.nameEn ?? anthem.nameZh)}
+              </p>
+              {anthem.audio ? (
+                <audio
+                  key={selected.cca3}
+                  controls
+                  preload="none"
+                  src={anthem.audio}
+                  className="mt-2 h-9 w-full"
+                />
+              ) : (
+                <p className="mt-1 text-xs text-slate-500">{t('panel.anthemNoAudio')}</p>
+              )}
+              <p className="mt-1.5 text-[10px] text-slate-600">{t('panel.anthemSource')}</p>
+            </Section>
+          )
+        })()}
+
         <Section title={t('panel.basics')}>
           <Row label={t('panel.capital')} value={capital} />
           <Row

@@ -223,6 +223,6 @@ export const UNIVERSE_FACTS: SpaceFacts = {
   ],
   descZh: '在最大尺度上，星系并非均匀分布，而是沿"宇宙网"排列：星系团由纤维状结构连接，其间是巨大的空洞。你所见的每一个光点都代表一个包含千亿恒星的星系。因宇宙持续膨胀，可观测宇宙的边界正离我们越来越远。',
   descEn: 'At the largest scales galaxies trace the "cosmic web": clusters linked by filaments, separated by immense voids. Every point of light here represents a galaxy of hundreds of billions of stars. As space itself expands, the edge of what we can observe recedes ever farther.',
-  noteZh: '宇宙网结构为程序化示意可视化。',
-  noteEn: 'The cosmic web shown is a procedural visualization.',
+  noteZh: '宇宙网结构与星系标注位置均为示意可视化，非真实坐标。',
+  noteEn: 'The cosmic web and galaxy label positions are schematic visualizations, not real coordinates.',
 }

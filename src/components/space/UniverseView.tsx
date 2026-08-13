@@ -12,6 +12,19 @@ import FactCard from './FactCard'
 const CLUSTERS = 130
 const R = 95
 
+/** 著名星系与大尺度结构标注（示意位置，非真实坐标） */
+const LANDMARKS: { nameZh: string; nameEn: string; pos: [number, number, number]; color: string }[] = [
+  { nameZh: '仙女座星系 M31', nameEn: 'Andromeda Galaxy M31', pos: [5, 1.5, 3], color: '#fbbf24' },
+  { nameZh: '三角座星系 M33', nameEn: 'Triangulum Galaxy M33', pos: [-4, -1, 5], color: '#fbbf24' },
+  { nameZh: '室女座星系团', nameEn: 'Virgo Cluster', pos: [16, 4, -9], color: '#7dd3fc' },
+  { nameZh: '后发座星系团', nameEn: 'Coma Cluster', pos: [-22, 7, 15], color: '#7dd3fc' },
+  { nameZh: '拉尼亚凯亚超星系团', nameEn: 'Laniakea Supercluster', pos: [11, -5, 8], color: '#a5b4fc' },
+  { nameZh: '夏普利超星系团', nameEn: 'Shapley Supercluster', pos: [-34, 9, -22], color: '#a5b4fc' },
+  { nameZh: '史隆长城', nameEn: 'Sloan Great Wall', pos: [42, -12, 26], color: '#c4b5fd' },
+  { nameZh: '武仙-北冕座长城', nameEn: 'Hercules–Corona Borealis Great Wall', pos: [-58, 16, 42], color: '#c4b5fd' },
+  { nameZh: '牧夫座空洞', nameEn: 'Boötes Void', pos: [26, 22, -48], color: '#64748b' },
+]
+
 /** 可观测宇宙视图：宇宙网（星系团 + 纤维结构）点云，每个点代表一个星系 */
 export default function UniverseView() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -99,20 +112,37 @@ export default function UniverseView() {
     )
     scene.add(web)
 
-    // “银河系在这里”标记
-    const span = document.createElement('span')
-    span.innerHTML = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#fbbf24;box-shadow:0 0 8px #fbbf24;margin-right:5px;vertical-align:middle"></span>${zh ? '银河系在这里' : 'You are here (Milky Way)'}`
-    span.style.cssText +=
-      ';position:absolute;transform:translate(-50%,-50%);font-size:12px;font-family:system-ui;color:#e2e8f0;text-shadow:0 0 5px rgba(2,6,23,.95);pointer-events:none;white-space:nowrap'
-    labelLayer.appendChild(span)
+    // 标注：银河系 + 著名星系与大尺度结构
+    const mkLabel = (text: string, color: string, size = 12) => {
+      const s = document.createElement('span')
+      s.innerHTML = `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${color};box-shadow:0 0 8px ${color};margin-right:5px;vertical-align:middle"></span>${text}`
+      s.style.cssText +=
+        `;position:absolute;transform:translate(-50%,-50%);font-size:${size}px;font-family:system-ui;color:#e2e8f0;text-shadow:0 0 5px rgba(2,6,23,.95);pointer-events:none;white-space:nowrap`
+      labelLayer.appendChild(s)
+      return s
+    }
+    const labels: { span: HTMLSpanElement; pos: Vector3 }[] = [
+      { span: mkLabel(zh ? '银河系在这里' : 'You are here (Milky Way)', '#fbbf24', 13), pos: new Vector3(0, 0, 0) },
+      ...LANDMARKS.map((l) => ({
+        span: mkLabel(zh ? l.nameZh : l.nameEn, l.color, 11),
+        pos: new Vector3(...l.pos),
+      })),
+    ]
 
     let raf = 0
     const tick = () => {
       web.rotation.y += 0.0003
-      const v = new Vector3(0, 0, 0).project(camera)
-      span.style.display = v.z < 1 ? 'block' : 'none'
-      span.style.left = `${((v.x + 1) / 2) * el.clientWidth}px`
-      span.style.top = `${((1 - v.y) / 2) * el.clientHeight}px`
+      web.updateMatrixWorld()
+      for (const { span, pos } of labels) {
+        // 标注点随宇宙网整体旋转
+        const v = pos.clone().applyMatrix4(web.matrixWorld).project(camera)
+        const visible = v.z < 1
+        span.style.display = visible ? 'block' : 'none'
+        if (visible) {
+          span.style.left = `${((v.x + 1) / 2) * el.clientWidth}px`
+          span.style.top = `${((1 - v.y) / 2) * el.clientHeight}px`
+        }
+      }
       controls.update()
       renderer.render(scene, camera)
       raf = requestAnimationFrame(tick)
@@ -132,7 +162,7 @@ export default function UniverseView() {
       controls.removeEventListener('change', onScaleCross)
       renderer.dispose()
       el.removeChild(renderer.domElement)
-      span.remove()
+      labels.forEach((l) => l.span.remove())
     }
   }, [zh])
 

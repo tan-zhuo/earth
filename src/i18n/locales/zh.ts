@@ -52,6 +52,9 @@ export default {
     panel: {
       officialName: '官方全称',
       basics: '基础信息',
+      anthem: '国歌',
+      anthemNoAudio: '暂无可用的免费音频',
+      anthemSource: '音频来自 Wikimedia Commons（公有领域/自由许可）',
       capital: '首都',
       region: '地区',
       area: '面积',
