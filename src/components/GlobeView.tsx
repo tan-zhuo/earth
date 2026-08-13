@@ -7,6 +7,7 @@ import {
 } from 'three'
 import type { Mesh, Texture } from 'three'
 import { EARTH_SATELLITES } from '../data/spacecraft'
+import { hideSplash } from '../splash'
 import { feature } from 'topojson-client'
 import type { Topology, GeometryCollection } from 'topojson-specification'
 import type { Feature, Geometry } from 'geojson'
@@ -192,8 +193,12 @@ export default function GlobeView() {
         )
         featsRef.current = feats
         if (!useAppStore.getState().timeTravel) world.polygonsData(feats)
+        hideSplash() // 地球与国界就绪，撤下启动页
       })
-      .catch((err) => console.error('加载国家边界失败', err))
+      .catch((err) => {
+        console.error('加载国家边界失败', err)
+        hideSplash() // 边界失败也不阻塞进入应用
+      })
 
     const ro = new ResizeObserver(() => {
       // 容器被隐藏（display:none）时尺寸为 0，跳过以免相机宽高比变为 NaN

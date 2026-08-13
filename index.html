@@ -65,9 +65,129 @@
         "codeRepository": "https://github.com/tan-zhuo/earth"
       }
     </script>
+
+    <!-- 启动页样式（内联，随 HTML 立即生效，不等 JS bundle） -->
+    <style>
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 22px;
+        background: radial-gradient(ellipse at 50% 40%, #0b1a33 0%, #020617 70%);
+        transition: opacity 0.5s ease;
+        font-family: system-ui, sans-serif;
+      }
+      #splash.splash-hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .splash-logo-wrap {
+        position: relative;
+        width: 96px;
+        height: 96px;
+      }
+      .splash-logo-wrap img {
+        width: 100%;
+        height: 100%;
+        animation: splash-breathe 2.4s ease-in-out infinite;
+      }
+      /* 环绕 logo 的轨道弧线 */
+      .splash-orbit {
+        position: absolute;
+        inset: -14px;
+        border: 1.5px solid transparent;
+        border-top-color: #38bdf8;
+        border-right-color: rgba(56, 189, 248, 0.25);
+        border-radius: 50%;
+        animation: splash-spin 1.6s linear infinite;
+      }
+      .splash-title {
+        color: #f1f5f9;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+      }
+      .splash-title small {
+        display: block;
+        margin-top: 6px;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 400;
+        text-align: center;
+      }
+      .splash-bar {
+        width: 180px;
+        height: 3px;
+        border-radius: 2px;
+        background: #1e293b;
+        overflow: hidden;
+      }
+      .splash-bar::after {
+        content: '';
+        display: block;
+        height: 100%;
+        width: 40%;
+        border-radius: 2px;
+        background: linear-gradient(90deg, transparent, #38bdf8, transparent);
+        animation: splash-shimmer 1.3s ease-in-out infinite;
+      }
+      @keyframes splash-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes splash-breathe {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.06);
+        }
+      }
+      @keyframes splash-shimmer {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(350%);
+        }
+      }
+    </style>
+    <noscript>
+      <style>
+        #splash {
+          display: none;
+        }
+      </style>
+    </noscript>
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- 启动页：应用就绪后由 src/splash.ts 淡出移除 -->
+    <div id="splash">
+      <div class="splash-logo-wrap">
+        <div class="splash-orbit"></div>
+        <img src="/logo.svg" alt="" />
+      </div>
+      <div class="splash-title">
+        Earth
+        <small>正在加载地球 · Loading Earth…</small>
+      </div>
+      <div class="splash-bar"></div>
+    </div>
+    <script>
+      // 兜底：应用异常时 12 秒后自动淡出启动页，不永久遮挡
+      setTimeout(function () {
+        var s = document.getElementById('splash')
+        if (s) s.classList.add('splash-hide')
+      }, 12000)
+    </script>
 
     <!-- 静态可爬取内容：供不执行 JS 的搜索引擎（如百度）索引，用户不可见 -->
     <section
