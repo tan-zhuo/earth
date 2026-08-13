@@ -17,6 +17,7 @@ interface AppState {
   /** 3D 图层开关 */
   showGdpBars: boolean
   showFlags: boolean
+  showSatellites: boolean
   /** 全球 GDP 数据（ISO3 → 最新值），供柱状图使用 */
   gdpAll: Record<string, GdpEntry> | null
   /** 时间旅行（大陆漂移）模式 */
@@ -32,6 +33,7 @@ interface AppState {
   toggleAutoRotate: () => void
   toggleGdpBars: () => void
   toggleFlags: () => void
+  toggleSatellites: () => void
   setGdpAll: (data: Record<string, GdpEntry>) => void
   toggleTimeTravel: () => void
   setEraIndex: (i: number) => void
@@ -53,6 +55,7 @@ export const useAppStore = create<AppState>((set) => ({
   autoRotate: true,
   showGdpBars: true,
   showFlags: true,
+  showSatellites: true,
   gdpAll: null,
   timeTravel: false,
   eraIndex: 0,
@@ -63,6 +66,7 @@ export const useAppStore = create<AppState>((set) => ({
   toggleAutoRotate: () => set((s) => ({ autoRotate: !s.autoRotate })),
   toggleGdpBars: () => set((s) => ({ showGdpBars: !s.showGdpBars })),
   toggleFlags: () => set((s) => ({ showFlags: !s.showFlags })),
+  toggleSatellites: () => set((s) => ({ showSatellites: !s.showSatellites })),
   setGdpAll: (data) => set({ gdpAll: data }),
   // 进入时间旅行：从最古老时代开始，并关闭已打开的国家详情
   toggleTimeTravel: () =>

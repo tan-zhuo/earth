@@ -48,6 +48,8 @@ export default function Sidebar() {
   const toggleFlags = useAppStore((s) => s.toggleFlags)
   const showRoutes = useAppStore((s) => s.showRoutes)
   const toggleRoutes = useAppStore((s) => s.toggleRoutes)
+  const showSatellites = useAppStore((s) => s.showSatellites)
+  const toggleSatellites = useAppStore((s) => s.toggleSatellites)
   const showRankings = useAppStore((s) => s.showRankings)
   const toggleRankings = useAppStore((s) => s.toggleRankings)
   const timeTravel = useAppStore((s) => s.timeTravel)
@@ -195,6 +197,7 @@ export default function Sidebar() {
               <ToggleRow label={t('layerGdpBars')} on={showGdpBars} onClick={toggleGdpBars} />
               <ToggleRow label={t('layerFlags')} on={showFlags} onClick={toggleFlags} />
               <ToggleRow label={t('layerRoutes')} on={showRoutes} onClick={toggleRoutes} />
+              <ToggleRow label={t('layerSatellites')} on={showSatellites} onClick={toggleSatellites} />
 
               <SectionTitle>{t('sections.features')}</SectionTitle>
               <ToggleRow

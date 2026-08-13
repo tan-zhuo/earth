@@ -21,6 +21,7 @@ export default {
     },
     layerGdpBars: 'GDP bars',
     layerFlags: 'Flags',
+    layerSatellites: 'Satellites',
     timeTravel: 'Time travel',
     layerRoutes: 'Sea routes',
     views: {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  AmbientLight, BackSide, CanvasTexture, DoubleSide, Group, LineBasicMaterial, LineLoop,
+  AmbientLight, BackSide, CanvasTexture, DoubleSide, Group, Line, LineBasicMaterial, LineLoop,
   Mesh, MeshBasicMaterial, MeshPhongMaterial, PerspectiveCamera, PointLight, Raycaster,
   RingGeometry, Scene, SphereGeometry, Sprite, SpriteMaterial, SRGBColorSpace, TextureLoader,
   Vector2, Vector3, WebGLRenderer, BufferGeometry, Float32BufferAttribute,
@@ -8,6 +8,7 @@ import {
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { useTranslation } from 'react-i18next'
 import { PLANETS, SUN_FACTS, SOLAR_NOTE } from '../../data/space'
+import { DEEP_SPACE_PROBES } from '../../data/spacecraft'
 import { useAppStore } from '../../store/useAppStore'
 import FactCard from './FactCard'
 
@@ -189,6 +190,32 @@ export default function SolarSystemView() {
         span.style.fontSize = '10px'
       }
     }
+    // 深空探测器：方向示意 + 真实距离标签 + 轨迹线
+    const probePositions: [string, Vector3][] = []
+    for (const probe of DEEP_SPACE_PROBES) {
+      const pos = new Vector3(...probe.pos)
+      const dot = new Mesh(new SphereGeometry(1.1, 12, 12), new MeshBasicMaterial({ color: 0xe2e8f0 }))
+      dot.position.copy(pos)
+      scene.add(dot)
+      // 从内太阳系方向拉出的轨迹线
+      const from = pos.clone().normalize().multiplyScalar(Math.min(60, pos.length() * 0.35))
+      const trackGeo = new BufferGeometry()
+      trackGeo.setAttribute(
+        'position',
+        new Float32BufferAttribute([from.x, from.y, from.z, pos.x, pos.y, pos.z], 3),
+      )
+      scene.add(
+        new Line(trackGeo, new LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.3 })),
+      )
+      mkLabel(probe.id, `${zh ? probe.nameZh : probe.nameEn} · ${zh ? probe.tagZh : probe.tagEn}`)
+      const span = labelEls.get(probe.id)
+      if (span) {
+        span.style.color = '#cbd5e1'
+        span.style.fontSize = '10px'
+      }
+      probePositions.push([probe.id, pos])
+    }
+
     /** 按地球当前轨道角更新 L1–L5 位置 */
     const updateLagrange = (earthAngle: number, earthDist: number) => {
       const dir = new Vector3(Math.cos(earthAngle), 0, Math.sin(earthAngle))
@@ -257,6 +284,7 @@ export default function SolarSystemView() {
         if (pm.id === 'earth') updateLagrange(pm.angle, pm.dist)
       }
       projectLabel('sun', new Vector3(0, 0, 0))
+      for (const [id, pos] of probePositions) projectLabel(id, pos)
       controls.update()
       renderer.render(scene, camera)
       raf = requestAnimationFrame(tick)

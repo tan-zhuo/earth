@@ -1,8 +1,12 @@
 import { useEffect, useRef } from 'react'
 import Globe from 'globe.gl'
 import type { GlobeInstance } from 'globe.gl'
-import { TextureLoader, SRGBColorSpace, MeshPhongMaterial } from 'three'
+import {
+  TextureLoader, SRGBColorSpace, MeshPhongMaterial, Group, Mesh as ThreeMesh, SphereGeometry,
+  MeshBasicMaterial, BufferGeometry, Float32BufferAttribute, LineLoop, LineBasicMaterial, Vector3,
+} from 'three'
 import type { Mesh, Texture } from 'three'
+import { EARTH_SATELLITES } from '../data/spacecraft'
 import { feature } from 'topojson-client'
 import type { Topology, GeometryCollection } from 'topojson-specification'
 import type { Feature, Geometry } from 'geojson'
@@ -57,8 +61,10 @@ export default function GlobeView() {
   const eraIndex = useAppStore((s) => s.eraIndex)
   const showRoutes = useAppStore((s) => s.showRoutes)
   const view = useAppStore((s) => s.view)
+  const showSatellites = useAppStore((s) => s.showSatellites)
   const featsRef = useRef<CountryFeature[]>([])
   const enteredEarthAtRef = useRef(0)
+  const satLabelsRef = useRef<HTMLDivElement>(null)
 
   /* ---- 时间旅行贴图交叉淡化所需的引用 ---- */
   /** ma → 已解码并上传 GPU 的贴图（key 0 = 现代夜景） */
@@ -190,7 +196,10 @@ export default function GlobeView() {
       .catch((err) => console.error('加载国家边界失败', err))
 
     const ro = new ResizeObserver(() => {
-      world.width(el.clientWidth).height(el.clientHeight)
+      // 容器被隐藏（display:none）时尺寸为 0，跳过以免相机宽高比变为 NaN
+      if (el.clientWidth > 0 && el.clientHeight > 0) {
+        world.width(el.clientWidth).height(el.clientHeight)
+      }
     })
     ro.observe(el)
 
@@ -462,6 +471,78 @@ export default function GlobeView() {
     }
   }, [timeTravel, eraIndex])
 
+  // 知名卫星图层：真实轨道参数（高度/倾角/周期），动画 300 倍速，标签逐帧投影
+  useEffect(() => {
+    const world = globeRef.current
+    const labelLayer = satLabelsRef.current
+    if (!world || !labelLayer) return
+    if (!showSatellites || timeTravel || view !== 'earth') return
+
+    const group = new Group()
+    world.scene().add(group)
+    const camera = world.camera()
+    const SPEEDUP = 300
+
+    const sats = EARTH_SATELLITES.map((s) => {
+      const r = 100 * (1 + s.altKm / 6371)
+      const inc = (s.incDeg * Math.PI) / 180
+      const node = (s.node * Math.PI) / 180
+      // 轨道环
+      const pts: number[] = []
+      for (let i = 0; i <= 96; i++) {
+        const a = (i / 96) * Math.PI * 2
+        const p = new Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)
+        p.applyAxisAngle(new Vector3(1, 0, 0), inc)
+        p.applyAxisAngle(new Vector3(0, 1, 0), node)
+        pts.push(p.x, p.y, p.z)
+      }
+      const orbitGeo = new BufferGeometry()
+      orbitGeo.setAttribute('position', new Float32BufferAttribute(pts, 3))
+      group.add(new LineLoop(orbitGeo, new LineBasicMaterial({ color: s.color, transparent: true, opacity: 0.3 })))
+      // 卫星点
+      const dot = new ThreeMesh(new SphereGeometry(1.6, 12, 12), new MeshBasicMaterial({ color: s.color }))
+      group.add(dot)
+      // 标签
+      const span = document.createElement('span')
+      span.textContent = langRef.current.startsWith('zh') ? s.nameZh : s.nameEn
+      span.style.cssText =
+        `position:absolute;transform:translate(-50%,-160%);font-size:10px;font-family:system-ui;color:${s.color};` +
+        'text-shadow:0 0 4px rgba(2,6,23,.95);pointer-events:none;white-space:nowrap'
+      labelLayer.appendChild(span)
+      return { s, r, inc, node, dot, span, phase: Math.random() * Math.PI * 2 }
+    })
+
+    let raf = 0
+    const t0 = performance.now()
+    const tick = () => {
+      const t = ((performance.now() - t0) / 1000) * SPEEDUP
+      for (const sat of sats) {
+        const a = sat.phase + (t / (sat.s.periodMin * 60)) * Math.PI * 2
+        const p = new Vector3(Math.cos(a) * sat.r, 0, Math.sin(a) * sat.r)
+        p.applyAxisAngle(new Vector3(1, 0, 0), sat.inc)
+        p.applyAxisAngle(new Vector3(0, 1, 0), sat.node)
+        sat.dot.position.copy(p)
+        const v = p.clone().project(camera)
+        const visible = v.z < 1
+        sat.span.style.display = visible ? 'block' : 'none'
+        if (visible) {
+          const el = containerRef.current!
+          sat.span.style.left = `${((v.x + 1) / 2) * el.clientWidth}px`
+          sat.span.style.top = `${((1 - v.y) / 2) * el.clientHeight}px`
+        }
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+
+    return () => {
+      cancelAnimationFrame(raf)
+      world.scene().remove(group)
+      sats.forEach((sat) => sat.span.remove())
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSatellites, timeTravel, view, i18n.language])
+
   // 切到其他尺度视图时隐藏并暂停渲染循环（保留实例，返回地球免重建）
   useEffect(() => {
     const world = globeRef.current
@@ -471,9 +552,15 @@ export default function GlobeView() {
       el.style.display = ''
       world.resumeAnimation()
       enteredEarthAtRef.current = performance.now()
+      // 恢复显示后显式重设渲染尺寸（防御隐藏期间的 0 尺寸状态）
+      if (el.clientWidth > 0 && el.clientHeight > 0) {
+        world.width(el.clientWidth).height(el.clientHeight)
+      }
       // 从太阳系缩放回来时视角还在穿越阈值之外，立即拉回总览高度避免再次触发
       const pov = world.pointOfView()
-      if (pov.altitude > 3.5) world.pointOfView({ ...pov, altitude: OVERVIEW_ALTITUDE }, 0)
+      if (!Number.isFinite(pov.altitude) || pov.altitude > 3.5) {
+        world.pointOfView({ lat: 25, lng: 105, altitude: OVERVIEW_ALTITUDE }, 0)
+      }
     } else {
       el.style.display = 'none'
       world.pauseAnimation()
@@ -481,5 +568,15 @@ export default function GlobeView() {
   }, [view])
 
   // z-0 创建层叠上下文，约束 globe.gl html 图层（国旗）不覆盖 UI 面板
-  return <div ref={containerRef} className="absolute inset-0 z-0" />
+  return (
+    <>
+      <div ref={containerRef} className="absolute inset-0 z-0" />
+      {/* 卫星标签覆盖层（随地球视图显隐） */}
+      <div
+        ref={satLabelsRef}
+        className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
+        style={{ display: view === 'earth' ? '' : 'none' }}
+      />
+    </>
+  )
 }

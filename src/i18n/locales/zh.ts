@@ -21,6 +21,7 @@ export default {
     },
     layerGdpBars: 'GDP 柱状图',
     layerFlags: '国旗',
+    layerSatellites: '知名卫星',
     timeTravel: '时间旅行',
     layerRoutes: '航线',
     views: {
