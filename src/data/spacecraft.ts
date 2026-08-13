@@ -1,9 +1,9 @@
 /**
  * 人类航天器标注数据（双语）：
- * 地球轨道知名卫星（轨道参数真实，动画加速播放）+ 深空探测器（方向示意 + 真实距离）。
+ * 地球轨道航天器/星座（轨道参数真实，动画加速播放）+ 深空探测器（方向示意 + 真实距离）。
  */
 
-export interface EarthSatellite {
+export interface SatConstellation {
   id: string
   nameZh: string
   nameEn: string
@@ -13,17 +13,25 @@ export interface EarthSatellite {
   incDeg: number
   /** 轨道周期（分钟） */
   periodMin: number
-  /** 升交点经度偏移（度），错开各轨道相位 */
-  node: number
+  /** 轨道面数量 */
+  planes: number
+  /** 每个轨道面的卫星数 */
+  satsPerPlane: number
+  /** 首个轨道面升交点经度（度），错开各星座 */
+  node0: number
   color: string
+  /** 轨道环透明度 */
+  ringOpacity: number
 }
 
-export const EARTH_SATELLITES: EarthSatellite[] = [
-  { id: 'iss', nameZh: '国际空间站', nameEn: 'ISS', altKm: 420, incDeg: 51.6, periodMin: 92, node: 0, color: '#facc15' },
-  { id: 'tiangong', nameZh: '天宫空间站', nameEn: 'Tiangong', altKm: 390, incDeg: 41.5, periodMin: 92, node: 130, color: '#f87171' },
-  { id: 'hubble', nameZh: '哈勃望远镜', nameEn: 'Hubble', altKm: 540, incDeg: 28.5, periodMin: 95, node: 250, color: '#a78bfa' },
-  { id: 'gps', nameZh: 'GPS 卫星（20,200 km）', nameEn: 'GPS satellite (20,200 km)', altKm: 20200, incDeg: 55, periodMin: 718, node: 40, color: '#34d399' },
-  { id: 'geo', nameZh: '静止轨道卫星（35,786 km）', nameEn: 'Geostationary (35,786 km)', altKm: 35786, incDeg: 0, periodMin: 1436, node: 0, color: '#38bdf8' },
+export const EARTH_SATELLITES: SatConstellation[] = [
+  { id: 'iss', nameZh: '国际空间站', nameEn: 'ISS', altKm: 420, incDeg: 51.6, periodMin: 92, planes: 1, satsPerPlane: 1, node0: 0, color: '#facc15', ringOpacity: 0.3 },
+  { id: 'tiangong', nameZh: '天宫空间站', nameEn: 'Tiangong', altKm: 390, incDeg: 41.5, periodMin: 92, planes: 1, satsPerPlane: 1, node0: 130, color: '#f87171', ringOpacity: 0.3 },
+  { id: 'hubble', nameZh: '哈勃望远镜', nameEn: 'Hubble', altKm: 540, incDeg: 28.5, periodMin: 95, planes: 1, satsPerPlane: 1, node0: 250, color: '#a78bfa', ringOpacity: 0.3 },
+  { id: 'starlink', nameZh: '星链星座（7,000+ 颗 · 示意 60 颗）', nameEn: 'Starlink (7,000+ sats · 60 shown)', altKm: 550, incDeg: 53, periodMin: 95, planes: 6, satsPerPlane: 10, node0: 15, color: '#94a3b8', ringOpacity: 0.07 },
+  { id: 'gps', nameZh: 'GPS 星座（31 颗在轨 · 6 轨道面）', nameEn: 'GPS constellation (31 in orbit · 6 planes)', altKm: 20200, incDeg: 55, periodMin: 718, planes: 6, satsPerPlane: 4, node0: 20, color: '#34d399', ringOpacity: 0.15 },
+  { id: 'beidou', nameZh: '北斗星座（45 颗在轨 · MEO 示意）', nameEn: 'BeiDou constellation (45 in orbit · MEO shown)', altKm: 21500, incDeg: 55, periodMin: 773, planes: 3, satsPerPlane: 8, node0: 90, color: '#fb923c', ringOpacity: 0.15 },
+  { id: 'geo', nameZh: '静止轨道卫星带（35,786 km）', nameEn: 'Geostationary belt (35,786 km)', altKm: 35786, incDeg: 0, periodMin: 1436, planes: 1, satsPerPlane: 14, node0: 0, color: '#38bdf8', ringOpacity: 0.28 },
 ]
 
 export interface DeepSpaceProbe {

@@ -471,7 +471,7 @@ export default function GlobeView() {
     }
   }, [timeTravel, eraIndex])
 
-  // 知名卫星图层：真实轨道参数（高度/倾角/周期），动画 300 倍速，标签逐帧投影
+  // 航天器/星座图层：真实轨道参数（高度/倾角/周期/轨道面），动画 300 倍速，标签逐帧投影
   useEffect(() => {
     const world = globeRef.current
     const labelLayer = satLabelsRef.current
@@ -482,54 +482,75 @@ export default function GlobeView() {
     world.scene().add(group)
     const camera = world.camera()
     const SPEEDUP = 300
+    const dotGeo = new SphereGeometry(1.3, 8, 8) // 所有卫星共享几何体
 
-    const sats = EARTH_SATELLITES.map((s) => {
+    const constellations = EARTH_SATELLITES.map((s) => {
       const r = 100 * (1 + s.altKm / 6371)
       const inc = (s.incDeg * Math.PI) / 180
-      const node = (s.node * Math.PI) / 180
-      // 轨道环
-      const pts: number[] = []
-      for (let i = 0; i <= 96; i++) {
-        const a = (i / 96) * Math.PI * 2
-        const p = new Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)
-        p.applyAxisAngle(new Vector3(1, 0, 0), inc)
-        p.applyAxisAngle(new Vector3(0, 1, 0), node)
-        pts.push(p.x, p.y, p.z)
+      const dotMat = new MeshBasicMaterial({ color: s.color })
+      const sats: { dot: ThreeMesh; node: number; phase: number }[] = []
+
+      for (let plane = 0; plane < s.planes; plane++) {
+        const node = ((s.node0 + (plane * 360) / s.planes) * Math.PI) / 180
+        // 每个轨道面画一条轨道环
+        const pts: number[] = []
+        for (let i = 0; i <= 96; i++) {
+          const a = (i / 96) * Math.PI * 2
+          const p = new Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)
+          p.applyAxisAngle(new Vector3(1, 0, 0), inc)
+          p.applyAxisAngle(new Vector3(0, 1, 0), node)
+          pts.push(p.x, p.y, p.z)
+        }
+        const orbitGeo = new BufferGeometry()
+        orbitGeo.setAttribute('position', new Float32BufferAttribute(pts, 3))
+        group.add(
+          new LineLoop(orbitGeo, new LineBasicMaterial({ color: s.color, transparent: true, opacity: s.ringOpacity })),
+        )
+        // 该面内的卫星均匀分布（相邻面错开半个间隔）
+        for (let j = 0; j < s.satsPerPlane; j++) {
+          const dot = new ThreeMesh(dotGeo, dotMat)
+          group.add(dot)
+          sats.push({
+            dot,
+            node,
+            phase: (j / s.satsPerPlane) * Math.PI * 2 + (plane % 2) * (Math.PI / s.satsPerPlane),
+          })
+        }
       }
-      const orbitGeo = new BufferGeometry()
-      orbitGeo.setAttribute('position', new Float32BufferAttribute(pts, 3))
-      group.add(new LineLoop(orbitGeo, new LineBasicMaterial({ color: s.color, transparent: true, opacity: 0.3 })))
-      // 卫星点
-      const dot = new ThreeMesh(new SphereGeometry(1.6, 12, 12), new MeshBasicMaterial({ color: s.color }))
-      group.add(dot)
-      // 标签
+
+      // 每个星座一个标签，跟随首颗卫星
       const span = document.createElement('span')
       span.textContent = langRef.current.startsWith('zh') ? s.nameZh : s.nameEn
       span.style.cssText =
         `position:absolute;transform:translate(-50%,-160%);font-size:10px;font-family:system-ui;color:${s.color};` +
         'text-shadow:0 0 4px rgba(2,6,23,.95);pointer-events:none;white-space:nowrap'
       labelLayer.appendChild(span)
-      return { s, r, inc, node, dot, span, phase: Math.random() * Math.PI * 2 }
+      return { s, r, inc, sats, span }
     })
 
     let raf = 0
     const t0 = performance.now()
     const tick = () => {
       const t = ((performance.now() - t0) / 1000) * SPEEDUP
-      for (const sat of sats) {
-        const a = sat.phase + (t / (sat.s.periodMin * 60)) * Math.PI * 2
-        const p = new Vector3(Math.cos(a) * sat.r, 0, Math.sin(a) * sat.r)
-        p.applyAxisAngle(new Vector3(1, 0, 0), sat.inc)
-        p.applyAxisAngle(new Vector3(0, 1, 0), sat.node)
-        sat.dot.position.copy(p)
-        const v = p.clone().project(camera)
-        const visible = v.z < 1
-        sat.span.style.display = visible ? 'block' : 'none'
-        if (visible) {
-          const el = containerRef.current!
-          sat.span.style.left = `${((v.x + 1) / 2) * el.clientWidth}px`
-          sat.span.style.top = `${((1 - v.y) / 2) * el.clientHeight}px`
-        }
+      for (const c of constellations) {
+        const baseAngle = (t / (c.s.periodMin * 60)) * Math.PI * 2
+        c.sats.forEach((sat, i) => {
+          const a = sat.phase + baseAngle
+          const p = new Vector3(Math.cos(a) * c.r, 0, Math.sin(a) * c.r)
+          p.applyAxisAngle(new Vector3(1, 0, 0), c.inc)
+          p.applyAxisAngle(new Vector3(0, 1, 0), sat.node)
+          sat.dot.position.copy(p)
+          if (i === 0) {
+            const v = p.clone().project(camera)
+            const visible = v.z < 1
+            c.span.style.display = visible ? 'block' : 'none'
+            if (visible) {
+              const el = containerRef.current!
+              c.span.style.left = `${((v.x + 1) / 2) * el.clientWidth}px`
+              c.span.style.top = `${((1 - v.y) / 2) * el.clientHeight}px`
+            }
+          }
+        })
       }
       raf = requestAnimationFrame(tick)
     }
@@ -538,7 +559,7 @@ export default function GlobeView() {
     return () => {
       cancelAnimationFrame(raf)
       world.scene().remove(group)
-      sats.forEach((sat) => sat.span.remove())
+      constellations.forEach((c) => c.span.remove())
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showSatellites, timeTravel, view, i18n.language])
