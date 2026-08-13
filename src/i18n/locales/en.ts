@@ -15,6 +15,7 @@ export default {
     searchNoResult: 'No matching country',
     sections: {
       scale: 'Cosmic Scale',
+      explore: 'Explore',
       layers: 'Earth Layers',
       features: 'Features',
     },
@@ -28,6 +29,13 @@ export default {
       solar: 'Solar System',
       galaxy: 'Galaxy',
       universe: 'Universe',
+      earthStructure: "Earth's Interior",
+      mars: 'Mars',
+    },
+    structureModes: {
+      surface: 'Surface',
+      structure: 'Interior',
+      magnetic: 'Magnetic field',
     },
     rankingsBtn: 'Rankings',
     rankings: {

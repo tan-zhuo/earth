@@ -157,17 +157,54 @@ export default function SolarSystemView() {
       labelEls.set(id, span)
     }
     mkLabel('sun', zh ? '太阳' : 'Sun')
-    for (const p of PLANETS)
+    for (const p of PLANETS) {
+      const enterable = p.id === 'earth' || p.id === 'mars'
       mkLabel(
         p.id,
-        p.id === 'earth'
-          ? zh
-            ? '地球 · 点击进入'
-            : 'Earth · click to enter'
+        enterable
+          ? `${zh ? p.nameZh : p.nameEn} · ${zh ? '点击进入' : 'click to enter'}`
           : zh
             ? p.nameZh
             : p.nameEn,
       )
+    }
+
+    // 日地拉格朗日点 L1–L5（L1/L2 离地球仅 0.01 AU，展示距离经夸大）
+    const lagrangeDefs = [
+      { id: 'l1', text: 'L1' },
+      { id: 'l2', text: zh ? 'L2 · 韦布望远镜' : 'L2 · JWST' },
+      { id: 'l3', text: 'L3' },
+      { id: 'l4', text: 'L4' },
+      { id: 'l5', text: 'L5' },
+    ]
+    const lagrangeMeshes = new Map<string, Mesh>()
+    for (const ld of lagrangeDefs) {
+      const m = new Mesh(new SphereGeometry(0.7, 16, 16), new MeshBasicMaterial({ color: 0xa5f3fc }))
+      scene.add(m)
+      lagrangeMeshes.set(ld.id, m)
+      mkLabel(ld.id, ld.text)
+      const span = labelEls.get(ld.id)
+      if (span) {
+        span.style.color = '#a5f3fc'
+        span.style.fontSize = '10px'
+      }
+    }
+    /** 按地球当前轨道角更新 L1–L5 位置 */
+    const updateLagrange = (earthAngle: number, earthDist: number) => {
+      const dir = new Vector3(Math.cos(earthAngle), 0, Math.sin(earthAngle))
+      const set = (id: string, v: Vector3) => {
+        const m = lagrangeMeshes.get(id)
+        if (m) m.position.copy(v)
+        projectLabel(id, v)
+      }
+      set('l1', dir.clone().multiplyScalar(earthDist - 8))
+      set('l2', dir.clone().multiplyScalar(earthDist + 8))
+      set('l3', dir.clone().multiplyScalar(-earthDist))
+      const rot = (da: number) =>
+        new Vector3(Math.cos(earthAngle + da), 0, Math.sin(earthAngle + da)).multiplyScalar(earthDist)
+      set('l4', rot(-Math.PI / 3)) // 轨道前方 60°
+      set('l5', rot(Math.PI / 3)) // 轨道后方 60°
+    }
 
     const projectLabel = (id: string, worldPos: Vector3) => {
       const span = labelEls.get(id)
@@ -193,9 +230,13 @@ export default function SolarSystemView() {
       const hit = raycaster.intersectObjects(clickable, false)[0]
       if (!hit) return
       const id = hit.object.userData.id as string
-      // 点击地球：直接落回地球视图
+      // 点击地球/火星：进入对应天体视图
       if (id === 'earth') {
         useAppStore.getState().setView('earth')
+        return
+      }
+      if (id === 'mars') {
+        useAppStore.getState().setView('mars')
         return
       }
       setSelectedId(id)
@@ -213,6 +254,7 @@ export default function SolarSystemView() {
         pm.mesh.position.set(Math.cos(pm.angle) * pm.dist, 0, Math.sin(pm.angle) * pm.dist)
         pm.mesh.rotation.y += dt * 0.3
         projectLabel(pm.id, pm.mesh.getWorldPosition(new Vector3()))
+        if (pm.id === 'earth') updateLagrange(pm.angle, pm.dist)
       }
       projectLabel('sun', new Vector3(0, 0, 0))
       controls.update()

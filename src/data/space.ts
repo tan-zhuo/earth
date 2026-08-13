@@ -183,8 +183,8 @@ export const PLANETS: PlanetDef[] = [
 ]
 
 export const SOLAR_NOTE: [string, string] = [
-  '行星大小与轨道距离经压缩处理，非真实比例。贴图 © Solar System Scope (CC BY 4.0)。',
-  'Planet sizes and orbital distances are compressed, not to scale. Textures © Solar System Scope (CC BY 4.0).',
+  '行星大小与轨道距离经压缩处理，非真实比例；L1/L2 点距地球实际仅 0.01 AU，展示距离经夸大。贴图 © Solar System Scope (CC BY 4.0)。',
+  'Planet sizes and orbital distances are compressed, not to scale; L1/L2 are really only 0.01 AU from Earth (exaggerated here). Textures © Solar System Scope (CC BY 4.0).',
 ]
 
 /* ---------------- 银河系 ---------------- */

@@ -167,6 +167,27 @@ export default function Sidebar() {
             ))}
           </div>
 
+          {/* 深入探索 */}
+          <SectionTitle>{t('sections.explore')}</SectionTitle>
+          <div className="grid grid-cols-2 gap-1.5 px-1.5">
+            {(['earthStructure', 'mars'] as SpaceView[]).map((v) => (
+              <button
+                key={v}
+                onClick={() => {
+                  setView(v)
+                  setSidebarOpen(false)
+                }}
+                className={`rounded-lg border px-3 py-2 text-sm transition ${
+                  view === v
+                    ? 'border-sky-500/70 bg-sky-500/10 text-sky-300'
+                    : 'border-slate-700/50 text-slate-300 hover:border-sky-500/40 hover:text-sky-200'
+                }`}
+              >
+                {t(`views.${v}`)}
+              </button>
+            ))}
+          </div>
+
           {/* 地球专属：图层与功能 */}
           {view === 'earth' && (
             <>

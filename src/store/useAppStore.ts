@@ -3,8 +3,8 @@ import type { Country } from '../types'
 import { getAllCountries } from '../services/countries'
 import type { GdpEntry } from '../services/worldbank'
 
-/** 宇宙尺度阶梯：地球 → 月球 → 太阳系 → 银河系 → 可观测宇宙 */
-export type SpaceView = 'earth' | 'moon' | 'solar' | 'galaxy' | 'universe'
+/** 宇宙尺度阶梯（earth→moon→solar→galaxy→universe）+ 深入探索视图（earthStructure/mars） */
+export type SpaceView = 'earth' | 'moon' | 'solar' | 'galaxy' | 'universe' | 'earthStructure' | 'mars'
 
 interface AppState {
   /** 当前尺度视图 */

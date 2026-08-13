@@ -10,6 +10,8 @@ import MoonView from './components/space/MoonView'
 import SolarSystemView from './components/space/SolarSystemView'
 import GalaxyView from './components/space/GalaxyView'
 import UniverseView from './components/space/UniverseView'
+import EarthStructureView from './components/space/EarthStructureView'
+import MarsView from './components/space/MarsView'
 import { fetchAllGdp } from './services/worldbank'
 import { useAppStore } from './store/useAppStore'
 
@@ -51,6 +53,8 @@ export default function App() {
       {view === 'solar' && <SolarSystemView />}
       {view === 'galaxy' && <GalaxyView />}
       {view === 'universe' && <UniverseView />}
+      {view === 'earthStructure' && <EarthStructureView />}
+      {view === 'mars' && <MarsView />}
 
       <Header />
       <Sidebar />
@@ -71,7 +75,7 @@ export default function App() {
           {t('hint')} · {t('scaleHintEarth')}
         </p>
       )}
-      {view !== 'earth' && (
+      {view !== 'earth' && view !== 'earthStructure' && view !== 'mars' && (
         <p className="pointer-events-none fixed inset-x-0 bottom-4 z-10 text-center text-xs text-slate-500">
           {t(view === 'universe' ? 'scaleHintUniverse' : 'scaleHintSpace')}
         </p>

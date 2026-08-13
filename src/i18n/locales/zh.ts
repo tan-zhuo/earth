@@ -15,6 +15,7 @@ export default {
     searchNoResult: '未找到匹配的国家',
     sections: {
       scale: '宇宙尺度',
+      explore: '深入探索',
       layers: '地球图层',
       features: '功能',
     },
@@ -28,6 +29,13 @@ export default {
       solar: '太阳系',
       galaxy: '银河系',
       universe: '宇宙',
+      earthStructure: '地球内部',
+      mars: '火星',
+    },
+    structureModes: {
+      surface: '表面',
+      structure: '内部结构',
+      magnetic: '磁场',
     },
     rankingsBtn: '排行榜',
     rankings: {
