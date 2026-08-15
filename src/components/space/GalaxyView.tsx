@@ -40,11 +40,12 @@ export default function GalaxyView() {
     controls.minDistance = 30
     controls.maxDistance = 400
 
-    // 滚轮穿越尺度：缩到最小回到太阳系，拉到最大进入可观测宇宙
-    const mountedAt = performance.now()
+    // 滚轮穿越尺度：缩到最小回到太阳系，拉到最大进入可观测宇宙。
+    // 入场 800ms 免触发，到点后按当前距离复判一次（免触发期内越过阈值时不必再滚一次）
+    let armed = false
     let jumped = false
     const onScaleCross = () => {
-      if (jumped || performance.now() - mountedAt < 800) return
+      if (jumped || !armed) return
       const d = camera.position.length()
       if (d <= 33) {
         jumped = true
@@ -55,6 +56,10 @@ export default function GalaxyView() {
       }
     }
     controls.addEventListener('change', onScaleCross)
+    const armTimer = window.setTimeout(() => {
+      armed = true
+      onScaleCross()
+    }, 800)
 
     const galaxy = new Group()
     scene.add(galaxy)
@@ -272,6 +277,7 @@ export default function GalaxyView() {
 
     return () => {
       cancelAnimationFrame(raf)
+      window.clearTimeout(armTimer)
       ro.disconnect()
       controls.removeEventListener('change', onScaleCross)
       renderer.dispose()

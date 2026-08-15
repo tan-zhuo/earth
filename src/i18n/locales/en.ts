@@ -11,6 +11,8 @@ export default {
     autoRotateLabel: 'Auto-rotate',
     menu: 'Menu',
     exitTimeTravel: 'Exit time travel',
+    fullscreen: 'Fullscreen',
+    exitFullscreen: 'Exit fullscreen',
     searchPlaceholder: 'Search countries (name or code)…',
     searchNoResult: 'No matching country',
     sections: {

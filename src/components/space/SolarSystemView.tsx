@@ -52,11 +52,13 @@ export default function SolarSystemView() {
     controls.minDistance = 40
     controls.maxDistance = 600
 
-    // 滚轮穿越尺度：缩到最小回到地球，拉到最大进入银河系（入场 800ms 免触发）
-    const mountedAt = performance.now()
+    // 滚轮穿越尺度：缩到最小回到地球，拉到最大进入银河系。
+    // 入场 800ms 免触发（避开进场时残留的滚动惯性），到点后立刻按当前距离复判一次：
+    // 否则这段时间里若已经越过阈值，change 事件早已停发，用户得再滚一次才生效。
+    let armed = false
     let jumped = false
     const onScaleCross = () => {
-      if (jumped || performance.now() - mountedAt < 800) return
+      if (jumped || !armed) return
       const d = camera.position.length()
       if (d <= 44) {
         jumped = true
@@ -67,6 +69,10 @@ export default function SolarSystemView() {
       }
     }
     controls.addEventListener('change', onScaleCross)
+    const armTimer = window.setTimeout(() => {
+      armed = true
+      onScaleCross()
+    }, 800)
 
     scene.add(new AmbientLight(0xffffff, 0.5))
     const sunLight = new PointLight(0xfff3d6, 2200, 0, 1.6)
@@ -130,6 +136,16 @@ export default function SolarSystemView() {
       mesh.position.x = p.vDist
       group.add(mesh)
       clickable.push(mesh)
+
+      // 拾取代理：行星在屏幕上只有二十来像素且一直在公转，直接点本体很容易点空
+      // （用户反馈“要点两次才进得去”）。套一层不可见的大球专门接管点击。
+      const pick = new Mesh(
+        new SphereGeometry(Math.max(p.vRadius * 2.4, 5), 12, 12),
+        new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+      )
+      pick.userData.id = p.id
+      mesh.add(pick)
+      clickable.push(pick)
 
       if (p.hasRing) {
         // RingGeometry 默认 UV 不适配径向环形贴图，按半径重写 uv.x
@@ -269,16 +285,28 @@ export default function SolarSystemView() {
 
     // 点击拾取
     const raycaster = new Raycaster()
-    const onClick = (ev: MouseEvent) => {
+    /** 屏幕坐标 → 命中的天体 id */
+    const pickAt = (clientX: number, clientY: number): string | null => {
       const rect = renderer.domElement.getBoundingClientRect()
       const ndc = new Vector2(
-        ((ev.clientX - rect.left) / rect.width) * 2 - 1,
-        -((ev.clientY - rect.top) / rect.height) * 2 + 1,
+        ((clientX - rect.left) / rect.width) * 2 - 1,
+        -((clientY - rect.top) / rect.height) * 2 + 1,
       )
       raycaster.setFromCamera(ndc, camera)
       const hit = raycaster.intersectObjects(clickable, false)[0]
-      if (!hit) return
-      const id = hit.object.userData.id as string
+      return hit ? ((hit.object.userData.id as string) ?? null) : null
+    }
+
+    // 悬停变手型，明确告诉用户天体可点
+    const onMove = (ev: MouseEvent) => {
+      renderer.domElement.style.cursor = pickAt(ev.clientX, ev.clientY) ? 'pointer' : 'grab'
+    }
+    renderer.domElement.style.cursor = 'grab'
+    renderer.domElement.addEventListener('mousemove', onMove)
+
+    const onClick = (ev: MouseEvent) => {
+      const id = pickAt(ev.clientX, ev.clientY)
+      if (!id) return
       // 点击地球/火星：进入对应天体视图
       if (id === 'earth') {
         useAppStore.getState().setView('earth')
@@ -322,9 +350,11 @@ export default function SolarSystemView() {
 
     return () => {
       cancelAnimationFrame(raf)
+      window.clearTimeout(armTimer)
       ro.disconnect()
       controls.removeEventListener('change', onScaleCross)
       renderer.domElement.removeEventListener('click', onClick)
+      renderer.domElement.removeEventListener('mousemove', onMove)
       renderer.dispose()
       renderer.forceContextLoss() // 立即释放 WebGL 上下文，防止超限导致其他视图黑屏
       el.removeChild(renderer.domElement)

@@ -11,6 +11,8 @@ export default {
     autoRotateLabel: '地球自转',
     menu: '菜单',
     exitTimeTravel: '退出时间旅行',
+    fullscreen: '全屏',
+    exitFullscreen: '退出全屏',
     searchPlaceholder: '搜索国家（中/英文或代码）…',
     searchNoResult: '未找到匹配的国家',
     sections: {

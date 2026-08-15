@@ -576,17 +576,25 @@ export default function GlobeView() {
     if (!world || !el) return
     if (view === 'earth') {
       el.style.display = ''
-      world.resumeAnimation()
+      // 先记入场时间再动相机，保证下面这些编程改动都落在 onZoom 的免触发窗口内
       enteredEarthAtRef.current = performance.now()
+      world.resumeAnimation()
       // 恢复显示后显式重设渲染尺寸（防御隐藏期间的 0 尺寸状态）
       if (el.clientWidth > 0 && el.clientHeight > 0) {
         world.width(el.clientWidth).height(el.clientHeight)
       }
-      // 从太阳系缩放回来时视角还在穿越阈值之外，立即拉回总览高度避免再次触发
+      // 回到地球一律拉回总览高度：离开时相机停在穿越阈值之外，只要有一帧漏出阈值，
+      // onZoom 就会把视图弹回太阳系——表现就是“要滚两次/点两次才切得过来”
       const pov = world.pointOfView()
-      if (!Number.isFinite(pov.altitude) || pov.altitude > 6) {
-        world.pointOfView({ lat: 25, lng: 105, altitude: OVERVIEW_ALTITUDE }, 0)
-      }
+      const lat = Number.isFinite(pov.lat) ? pov.lat : 25
+      const lng = Number.isFinite(pov.lng) ? pov.lng : 105
+      world.pointOfView({ lat, lng, altitude: OVERVIEW_ALTITUDE }, 0)
+      // 清掉 OrbitControls 残留的阻尼动量（离开时的滚轮/拖拽惯性会在恢复渲染后继续把相机往外推）
+      const controls = world.controls()
+      const damping = controls.enableDamping
+      controls.enableDamping = false
+      controls.update()
+      controls.enableDamping = damping
     } else {
       el.style.display = 'none'
       world.pauseAnimation()
