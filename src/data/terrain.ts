@@ -20,8 +20,8 @@ export const EARTH_RADIUS_M = 6_371_000
 /** 贴图中的最高点（20km 网格平均后约 6.2km），用于给国界/国旗等矢量图层留净空 */
 export const MAX_TERRAIN_M = 6500
 /** 垂直夸张默认值与范围：真实比例下珠峰只有地球半径的 0.14%，必须放大才看得见 */
-export const EXAGGERATION_DEFAULT = 12
-export const EXAGGERATION_MAX = 25
+export const EXAGGERATION_DEFAULT = 25
+export const EXAGGERATION_MAX = 60
 
 /** 高程字节 → 米 */
 export const byteToMeters = (b: number) => (b - SEA_BYTE) * ELEV_STEP

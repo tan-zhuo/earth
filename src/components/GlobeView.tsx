@@ -4,6 +4,7 @@ import type { GlobeInstance } from 'globe.gl'
 import {
   TextureLoader, SRGBColorSpace, MeshPhongMaterial, Group, Mesh as ThreeMesh, SphereGeometry,
   MeshBasicMaterial, BufferGeometry, Float32BufferAttribute, LineLoop, LineBasicMaterial, Vector3,
+  Raycaster, Sphere, Vector2,
 } from 'three'
 import type { Mesh, Texture } from 'three'
 import { EARTH_SATELLITES } from '../data/spacecraft'
@@ -20,8 +21,10 @@ import { formatUsd } from '../utils/format'
 import { PALEO_ERAS } from '../data/paleoEras'
 import { PORTS, ROUTE_LEGS } from '../data/shippingRoutes'
 import type { Port } from '../data/shippingRoutes'
+import { buildDrapedBorders } from './terrainBorders'
 import { attachTerrain } from './terrainShader'
 import type { TerrainController } from './terrainShader'
+import type { LineSegments } from 'three'
 import { EARTH_RADIUS_M, MAX_TERRAIN_M, loadElevationSampler } from '../data/terrain'
 import type { ElevationSampler } from '../data/terrain'
 
@@ -44,6 +47,34 @@ const OVERVIEW_ALTITUDE = 2.5
  * 返回值是 globe.gl 的 altitude（地球半径的倍数）。
  */
 const terrainCeiling = (exaggeration: number) => (MAX_TERRAIN_M * exaggeration) / EARTH_RADIUS_M
+
+/** 地球球面（three-globe 半径 100），用于解析拾取 */
+const GLOBE_SPHERE = new Sphere(new Vector3(0, 0, 0), 100)
+/** 地形开启后的球面细分：360/0.4 = 900×450 段，约 40 万顶点。
+ *  再粗一档，高倍夸张下海沟/陡坡会出现明显的方格棱面 */
+const TERRAIN_CURVATURE = 0.4
+/** 相机最近距离（世界单位，地球半径 100）：开地形后允许贴近地表，
+ *  透视下山脉才有"立起来"的体量感 */
+const MIN_DISTANCE_TERRAIN = 108
+const MIN_DISTANCE_FLAT = 130
+
+/**
+ * 用解析求交替换地球网格的逐三角形拾取。
+ * 地形细分后地球有 50 万个三角形，而 globe.gl 每次悬停都要整体求交一次
+ * （实测单次 100ms+，指针一进地球主线程就卡住）。地球本就是标准球面，
+ * 解析求交是 O(1)，结果也更准 —— CPU 侧几何体本来就不含着色器里的地形位移。
+ */
+function useSphereRaycast(mesh: ThreeMesh) {
+  const hit = new Vector3()
+  mesh.raycast = (raycaster, intersects) => {
+    if (!raycaster.ray.intersectSphere(GLOBE_SPHERE, hit)) return
+    intersects.push({
+      distance: raycaster.ray.origin.distanceTo(hit),
+      point: hit.clone(),
+      object: mesh,
+    })
+  }
+}
 
 /** 柱子颜色按世界银行收入分组着色（与详情面板徽章一致） */
 const BAR_COLORS: Record<string, string> = {
@@ -87,6 +118,13 @@ export default function GlobeView() {
   const elevRef = useRef<ElevationSampler | null>(null)
   /** 当前生效的垂直夸张倍数，供 globe.gl 的访问器（非 React 上下文）读取 */
   const exaggRef = useRef(0)
+  /** 地球表面网格（three-globe 首次 digest 后才存在） */
+  const globeMeshRef = useRef<ThreeMesh | null>(null)
+  const tessellatedRef = useRef(false)
+  const wantTerrainRef = useRef(false)
+  /** 贴地国界（一次 draw call 的 LineSegments） */
+  const bordersRef = useRef<LineSegments | null>(null)
+  const [featsReady, setFeatsReady] = useState(false)
   const [elevReady, setElevReady] = useState(false)
 
   /* ---- 时间旅行贴图交叉淡化所需的引用 ---- */
@@ -112,6 +150,17 @@ export default function GlobeView() {
     f.id != null ? byCcn3Ref.current.get(String(f.id).padStart(3, '0')) : undefined
 
   /**
+   * 提高球面细分以承载地形位移（默认 90×45 撑不起山脉）。
+   * 必须等大气层辉光壳建好之后再提：辉光几何体是按当时的地球几何体克隆的，
+   * 提前细分会让大气层也变成 26 万顶点，白白多付一倍顶点开销。
+   */
+  const ensureTessellation = (world: GlobeInstance) => {
+    if (tessellatedRef.current || !globeMeshRef.current || !wantTerrainRef.current) return
+    tessellatedRef.current = true
+    world.globeCurvatureResolution(TERRAIN_CURVATURE)
+  }
+
+  /**
    * 某点的地形抬升（globe.gl 的 altitude 单位）。
    * 海面以下不下沉：国旗、港口这类标记始终留在海平面，不跟着沉进海盆。
    */
@@ -121,6 +170,23 @@ export default function GlobeView() {
     return (Math.max(0, sampler(lat, lng)) * exaggRef.current) / EARTH_RADIUS_M
   }
 
+  /**
+   * 地形模式下国界改由贴地折线绘制，多边形层退化成"拾取 + 高亮"：
+   * 除悬停/选中外全部隐藏 —— three 的射线拾取不看 visible，悬停/点击照常工作，
+   * 但省掉两百多个全透明网格的绘制与混合（实测帧时间不到原来的一半）。
+   */
+  const syncPolygonVisibility = (world: GlobeInstance) => {
+    const terrain = exaggRef.current > 0
+    world.scene().traverse((o) => {
+      const obj = o as unknown as { __globeObjType?: string; __data?: { data?: CountryFeature } }
+      if (obj.__globeObjType !== 'polygon') return
+      const f = obj.__data?.data
+      const c = f && countryOf(f)
+      o.visible =
+        !terrain || f === hoverRef.current || (!!c && c.cca3 === selectedRef.current?.cca3)
+    })
+  }
+
   /** 重新应用多边形样式（globe.gl 设置访问器即触发重绘） */
   const applyStyles = (world: GlobeInstance) => {
     const isHover = (f: object) => f === hoverRef.current
@@ -128,19 +194,26 @@ export default function GlobeView() {
       const c = countryOf(f as CountryFeature)
       return !!c && c.cca3 === selectedRef.current?.cca3
     }
-    // 地形开启时整层抬到最高峰之上，保证国界始终盖在地表上
+    // 地形开启后多边形整层退居幕后：只做拾取与悬停/选中高亮，
+    // 常态国界改由贴地折线绘制（平顶盖跟不了地形，抬高会悬空、放低会被山脉戳穿）
+    const terrain = exaggRef.current > 0
     const floor = Math.max(0.008, terrainCeiling(exaggRef.current) * 1.02)
     world
       .polygonAltitude((f) => (isHover(f) || isSelected(f) ? floor + 0.027 : floor))
       .polygonCapColor((f) => {
         if (isSelected(f)) return 'rgba(251, 191, 36, 0.55)' // 选中：琥珀色
         if (isHover(f)) return 'rgba(56, 189, 248, 0.45)' // 悬停：青色
-        return 'rgba(56, 189, 248, 0.06)'
+        return terrain ? 'rgba(0, 0, 0, 0)' : 'rgba(56, 189, 248, 0.06)'
       })
-      // 地形抬高了国界层，侧壁跟着变高，颜色要淡一些才不至于像悬空的黑墙
-      .polygonSideColor(() => (floor > 0.008 ? 'rgba(2, 6, 23, 0.18)' : 'rgba(2, 6, 23, 0.35)'))
+      .polygonSideColor((f) =>
+        terrain && !isHover(f) && !isSelected(f) ? 'rgba(0, 0, 0, 0)' : 'rgba(2, 6, 23, 0.35)',
+      )
       .polygonStrokeColor((f) =>
-        isHover(f) || isSelected(f) ? 'rgba(226, 232, 240, 0.9)' : 'rgba(148, 163, 184, 0.35)',
+        isHover(f) || isSelected(f)
+          ? 'rgba(226, 232, 240, 0.9)'
+          : terrain
+            ? 'rgba(0, 0, 0, 0)'
+            : 'rgba(148, 163, 184, 0.35)',
       )
       .polygonLabel((f) => {
         const cf = f as CountryFeature
@@ -154,6 +227,7 @@ export default function GlobeView() {
           ${secondary ? `<div style="font-size:11px;color:#94a3b8">${secondary}</div>` : ''}
         </div>`
       })
+    syncPolygonVisibility(world)
   }
 
   // 初始化地球（仅一次）
@@ -174,7 +248,7 @@ export default function GlobeView() {
     if (import.meta.env.DEV) (window as unknown as { __world?: GlobeInstance }).__world = world
     world.controls().autoRotate = true
     world.controls().autoRotateSpeed = 0.4
-    world.controls().minDistance = 130
+    world.controls().minDistance = MIN_DISTANCE_FLAT
     world.pointOfView({ lat: 25, lng: 105, altitude: OVERVIEW_ALTITUDE }, 0)
 
     // 自转的实现是相机环绕（OrbitControls.autoRotate），若星空天球留在场景里，
@@ -193,10 +267,28 @@ export default function GlobeView() {
       camera.add(sky)
       return true
     }
-    // 背景贴图异步加载，轮询直到天球出现并挂载成功
-    const skyTimer = window.setInterval(() => {
-      if (attachSkyToCamera()) window.clearInterval(skyTimer)
-    }, 200)
+    // three-globe 的场景对象要等首次 digest 之后才存在，轮询到位后做两件事：
+    // 挂载星空天球；把地球网格换成解析球面拾取并按需细分。
+    let skyDone = false
+    let meshDone = false
+    const setupTimer = window.setInterval(() => {
+      skyDone ||= attachSkyToCamera()
+      if (!meshDone) {
+        const material = world.globeMaterial()
+        let mesh: ThreeMesh | null = null
+        world.scene().traverse((o) => {
+          const m = o as ThreeMesh
+          if (!mesh && m.isMesh && m.material === material) mesh = m
+        })
+        if (mesh) {
+          globeMeshRef.current = mesh
+          useSphereRaycast(mesh)
+          ensureTessellation(world)
+          meshDone = true
+        }
+      }
+      if (skyDone && meshDone) window.clearInterval(setupTimer)
+    }, 100)
 
     applyStyles(world)
 
@@ -227,7 +319,12 @@ export default function GlobeView() {
           (f) => f.properties?.name !== 'Antarctica',
         )
         featsRef.current = feats
-        if (!useAppStore.getState().timeTravel) world.polygonsData(feats)
+        setFeatsReady(true)
+        if (!useAppStore.getState().timeTravel) {
+          world.polygonsData(feats)
+          // 多边形对象要等下一次 digest 才建出来，过渡结束后再同步一次可见性
+          window.setTimeout(() => applyStyles(world), 350)
+        }
         hideSplash() // 地球与国界就绪，撤下启动页
       })
       .catch((err) => {
@@ -235,15 +332,28 @@ export default function GlobeView() {
         hideSplash() // 边界失败也不阻塞进入应用
       })
 
-    // 指针位置的高程读数（节流 ~10Hz）：给地形面板提供“这里有多高/多深”
+    // 指针位置的高程读数（节流 ~10Hz）：给地形面板提供“这里有多高/多深”。
+    // 不用 world.toGlobeCoords —— 它会把全场景（含几百个卫星网格）都拾取一遍。
+    const raycaster = new Raycaster()
+    const ndc = new Vector2()
+    const hit = new Vector3()
     let lastSample = 0
     const onPointerMove = (ev: PointerEvent) => {
       if (!elevRef.current) return
       if (performance.now() - lastSample < 90) return
       lastSample = performance.now()
       const rect = el.getBoundingClientRect()
-      const coords = world.toGlobeCoords(ev.clientX - rect.left, ev.clientY - rect.top)
-      setCursor(coords ? { ...coords, elevation: elevRef.current(coords.lat, coords.lng) } : null)
+      ndc.set(
+        ((ev.clientX - rect.left) / rect.width) * 2 - 1,
+        -((ev.clientY - rect.top) / rect.height) * 2 + 1,
+      )
+      raycaster.setFromCamera(ndc, world.camera())
+      if (!raycaster.ray.intersectSphere(GLOBE_SPHERE, hit)) {
+        setCursor(null)
+        return
+      }
+      const { lat, lng } = world.toGeoCoords(hit)
+      setCursor({ lat, lng, elevation: elevRef.current(lat, lng) })
     }
     const onPointerLeave = () => setCursor(null)
     el.addEventListener('pointermove', onPointerMove)
@@ -258,7 +368,7 @@ export default function GlobeView() {
     ro.observe(el)
 
     return () => {
-      window.clearInterval(skyTimer)
+      window.clearInterval(setupTimer)
       el.removeEventListener('pointermove', onPointerMove)
       el.removeEventListener('pointerleave', onPointerLeave)
       ro.disconnect()
@@ -307,8 +417,8 @@ export default function GlobeView() {
 
     if (!terrainRef.current) {
       if (!exagg) return
-      // 默认球面只有 90×45 段，撑不起山脉；开启地形时才细分到 720×360
-      world.globeCurvatureResolution(0.5)
+      wantTerrainRef.current = true
+      ensureTessellation(world)
       terrainRef.current = attachTerrain(world.globeMaterial() as MeshPhongMaterial)
       terrainRef.current.ready.catch((err) => console.error('地形贴图加载失败', err))
       void loadElevationSampler()
@@ -320,9 +430,34 @@ export default function GlobeView() {
     }
     terrainRef.current.setExaggeration(exagg)
     terrainRef.current.setTint(showElevationTint && !timeTravel ? 1 : 0)
+    world.controls().minDistance = exagg ? MIN_DISTANCE_TERRAIN : MIN_DISTANCE_FLAT
     applyStyles(world)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showTerrain, exaggeration, showElevationTint, timeTravel])
+
+  // 贴地国界：地形开启时替代多边形描边，随夸张倍数重建
+  useEffect(() => {
+    const world = globeRef.current
+    if (!world) return
+    const scene = world.scene()
+    if (bordersRef.current) {
+      scene.remove(bordersRef.current)
+      bordersRef.current.geometry.dispose()
+      ;(bordersRef.current.material as LineBasicMaterial).dispose()
+      bordersRef.current = null
+    }
+    const exagg = showTerrain && !timeTravel ? exaggeration : 0
+    if (!exagg || !elevRef.current || !featsReady) return
+    const lines = buildDrapedBorders(featsRef.current, {
+      sampler: elevRef.current,
+      exaggeration: exagg,
+      toXYZ: (lat, lng, alt) => world.getCoords(lat, lng, alt),
+      color: '#94a3b8',
+      opacity: 0.45,
+    })
+    scene.add(lines)
+    bordersRef.current = lines
+  }, [showTerrain, exaggeration, timeTravel, elevReady, featsReady])
 
   // GDP 柱状图层：高度 = sqrt(GDP) 归一化（兼顾大小国可见性），颜色按收入分组
   useEffect(() => {
@@ -574,6 +709,7 @@ export default function GlobeView() {
         baseMat.needsUpdate = true
       }
       world.polygonsData(featsRef.current as object[])
+      window.setTimeout(() => applyStyles(world), 350)
     }
   }, [timeTravel, eraIndex])
 
@@ -609,12 +745,16 @@ export default function GlobeView() {
         }
         const orbitGeo = new BufferGeometry()
         orbitGeo.setAttribute('position', new Float32BufferAttribute(pts, 3))
-        group.add(
-          new LineLoop(orbitGeo, new LineBasicMaterial({ color: s.color, transparent: true, opacity: s.ringOpacity })),
+        const orbit = new LineLoop(
+          orbitGeo,
+          new LineBasicMaterial({ color: s.color, transparent: true, opacity: s.ringOpacity }),
         )
+        orbit.raycast = () => {}
+        group.add(orbit)
         // 该面内的卫星均匀分布（相邻面错开半个间隔）
         for (let j = 0; j < s.satsPerPlane; j++) {
           const dot = new ThreeMesh(dotGeo, dotMat)
+          dot.raycast = () => {} // 卫星不可点，别拖慢悬停拾取
           group.add(dot)
           sats.push({
             dot,
