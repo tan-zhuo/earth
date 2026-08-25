@@ -57,8 +57,10 @@ const FRAG_PARS = /* glsl */ `
 uniform sampler2D tElevation;
 uniform sampler2D tRelief;
 uniform sampler2D tPalette;
+uniform sampler2D tMask;      // R = 悬停国家，G = 选中国家
 uniform float uTint;          // 高程着色混合比 0~1
 uniform float uShade;         // 山体阴影强度（0 = 关）
+uniform float uMask;          // 高亮总开关（0 = 关）
 varying vec2 vTerrainUv;
 `
 
@@ -66,6 +68,12 @@ const FRAG_BODY = /* glsl */ `
 if (uTint > 0.0) {
   vec3 tint = texture2D(tPalette, vec2(texture2D(tElevation, vTerrainUv).r, 0.5)).rgb;
   diffuseColor.rgb = mix(diffuseColor.rgb, tint, uTint);
+}
+if (uMask > 0.0) {
+  // 高亮直接画在地表上：悬停青色、选中琥珀色，随地形起伏，不会悬空或被戳穿
+  vec2 m = texture2D(tMask, vTerrainUv).rg * uMask;
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.22, 0.74, 0.97), m.r * 0.45);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.98, 0.75, 0.14), m.g * 0.55);
 }
 if (uShade > 0.0) {
   vec2 texel = vec2(1.0 / ${TEX_W}.0, 1.0 / ${TEX_H}.0);
@@ -90,6 +98,8 @@ export interface TerrainController {
   setExaggeration(x: number): void
   /** 高程着色混合比 0~1 */
   setTint(v: number): void
+  /** 悬停/选中高亮掩码贴图（R 悬停 / G 选中） */
+  setMask(texture: Texture | null): void
   dispose(): void
 }
 
@@ -104,9 +114,11 @@ export function attachTerrain(material: MeshPhongMaterial): TerrainController {
     tElevation: { value: null as Texture | null },
     tRelief: { value: null as Texture | null },
     tPalette: { value: lut },
+    tMask: { value: null as Texture | null },
     uDisplace: { value: 0 },
     uShade: { value: 0 },
     uTint: { value: 0 },
+    uMask: { value: 0 },
   }
 
   material.onBeforeCompile = (shader) => {
@@ -136,6 +148,8 @@ export function attachTerrain(material: MeshPhongMaterial): TerrainController {
     uniforms.uDisplace.value = loaded ? (exaggeration * GLOBE_RADIUS) / EARTH_RADIUS_M : 0
     uniforms.uShade.value = loaded ? exaggeration * SHADE_BOOST * SLOPE_PER_UNIT : 0
     uniforms.uTint.value = loaded ? tint : 0
+    // 高亮掩码只在地形生效时使用（平地时仍用 globe.gl 原本的多边形高亮）
+    uniforms.uMask.value = loaded && uniforms.tMask.value && exaggeration > 0 ? 1 : 0
   }
 
   const ready = Promise.all([loadData(ELEVATION_TEXTURE), loadData(RELIEF_TEXTURE)]).then(
@@ -154,6 +168,10 @@ export function attachTerrain(material: MeshPhongMaterial): TerrainController {
     },
     setTint(v) {
       tint = v
+      apply()
+    },
+    setMask(texture) {
+      uniforms.tMask.value = texture
       apply()
     },
     dispose() {

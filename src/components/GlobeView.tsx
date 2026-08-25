@@ -22,6 +22,8 @@ import { PALEO_ERAS } from '../data/paleoEras'
 import { PORTS, ROUTE_LEGS } from '../data/shippingRoutes'
 import type { Port } from '../data/shippingRoutes'
 import { buildDrapedBorders } from './terrainBorders'
+import { createTerrainMask } from './terrainMask'
+import type { TerrainMask } from './terrainMask'
 import { attachTerrain } from './terrainShader'
 import type { TerrainController } from './terrainShader'
 import type { LineSegments } from 'three'
@@ -124,6 +126,8 @@ export default function GlobeView() {
   const wantTerrainRef = useRef(false)
   /** 贴地国界（一次 draw call 的 LineSegments） */
   const bordersRef = useRef<LineSegments | null>(null)
+  /** 悬停/选中高亮掩码（画进地表，跟着地形起伏） */
+  const maskRef = useRef<TerrainMask | null>(null)
   const [featsReady, setFeatsReady] = useState(false)
   const [elevReady, setElevReady] = useState(false)
 
@@ -171,20 +175,30 @@ export default function GlobeView() {
   }
 
   /**
-   * 地形模式下国界改由贴地折线绘制，多边形层退化成"拾取 + 高亮"：
-   * 除悬停/选中外全部隐藏 —— three 的射线拾取不看 visible，悬停/点击照常工作，
-   * 但省掉两百多个全透明网格的绘制与混合（实测帧时间不到原来的一半）。
+   * 地形模式下多边形层整体退居幕后：国界由贴地折线画，高亮由地表掩码画，
+   * 多边形只剩拾取用途 —— three 的射线拾取不看 visible，悬停/点击照常工作，
+   * 但省掉两百多个网格的绘制与混合（实测 draw call 1487 → 104）。
    */
   const syncPolygonVisibility = (world: GlobeInstance) => {
     const terrain = exaggRef.current > 0
     world.scene().traverse((o) => {
-      const obj = o as unknown as { __globeObjType?: string; __data?: { data?: CountryFeature } }
-      if (obj.__globeObjType !== 'polygon') return
-      const f = obj.__data?.data
-      const c = f && countryOf(f)
-      o.visible =
-        !terrain || f === hoverRef.current || (!!c && c.cca3 === selectedRef.current?.cca3)
+      if ((o as unknown as { __globeObjType?: string }).__globeObjType === 'polygon') {
+        o.visible = !terrain
+      }
     })
+  }
+
+  /** 把当前悬停/选中的国家画进地表高亮掩码 */
+  const syncHighlightMask = () => {
+    const mask = maskRef.current
+    if (!mask) return
+    if (!exaggRef.current) {
+      mask.update(null, null)
+      return
+    }
+    const sel = selectedRef.current
+    const selFeat = sel ? (featsRef.current.find((f) => countryOf(f)?.cca3 === sel.cca3) ?? null) : null
+    mask.update(hoverRef.current, selFeat)
   }
 
   /** 重新应用多边形样式（globe.gl 设置访问器即触发重绘） */
@@ -228,6 +242,7 @@ export default function GlobeView() {
         </div>`
       })
     syncPolygonVisibility(world)
+    syncHighlightMask()
   }
 
   // 初始化地球（仅一次）
@@ -375,6 +390,8 @@ export default function GlobeView() {
       // 地形着色器挂在这个实例的材质上，随实例一起销毁（严格模式重挂载时会重建）
       terrainRef.current?.dispose()
       terrainRef.current = null
+      maskRef.current?.dispose()
+      maskRef.current = null
       world._destructor()
       globeRef.current = null
     }
@@ -420,6 +437,8 @@ export default function GlobeView() {
       wantTerrainRef.current = true
       ensureTessellation(world)
       terrainRef.current = attachTerrain(world.globeMaterial() as MeshPhongMaterial)
+      maskRef.current = createTerrainMask()
+      terrainRef.current.setMask(maskRef.current.texture)
       terrainRef.current.ready.catch((err) => console.error('地形贴图加载失败', err))
       void loadElevationSampler()
         .then((sampler) => {
