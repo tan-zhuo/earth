@@ -3,8 +3,19 @@ import type { Country } from '../types'
 import { getAllCountries } from '../services/countries'
 import type { GdpEntry } from '../services/worldbank'
 
-/** 宇宙尺度阶梯（earth→moon→solar→galaxy→universe）+ 深入探索视图（earthStructure/mars） */
-export type SpaceView = 'earth' | 'moon' | 'solar' | 'galaxy' | 'universe' | 'earthStructure' | 'mars'
+/**
+ * 宇宙尺度阶梯（earth→moon→solar→galaxy→universe）
+ * + 深入探索视图（earthStructure/mars）+ 航天器 3D 展厅（spacecraft）
+ */
+export type SpaceView =
+  | 'earth'
+  | 'moon'
+  | 'solar'
+  | 'galaxy'
+  | 'universe'
+  | 'earthStructure'
+  | 'mars'
+  | 'spacecraft'
 
 interface AppState {
   /** 当前尺度视图 */
@@ -40,6 +51,9 @@ interface AppState {
   toggleRankings: () => void
   toggleRoutes: () => void
   setView: (v: SpaceView) => void
+  /** 航天器展厅当前展示的型号 */
+  craftId: string
+  setCraft: (id: string) => void
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
 }
@@ -77,6 +91,17 @@ export const useAppStore = create<AppState>((set) => ({
   // 切换尺度视图：离开地球时收起地球相关面板与模式
   setView: (v) =>
     set({ view: v, selected: null, showRankings: false, timeTravel: false, eraIndex: 0 }),
+  craftId: 'hubble',
+  // 从菜单直接点某台航天器：进入展厅并展示它
+  setCraft: (id) =>
+    set({
+      craftId: id,
+      view: 'spacecraft',
+      selected: null,
+      showRankings: false,
+      timeTravel: false,
+      eraIndex: 0,
+    }),
   sidebarOpen: false,
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
 }))

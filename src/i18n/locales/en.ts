@@ -20,6 +20,7 @@ export default {
       explore: 'Explore',
       layers: 'Earth Layers',
       features: 'Features',
+      spacecraft: 'Spacecraft in 3D',
     },
     layerGdpBars: 'GDP bars',
     layerFlags: 'Flags',
@@ -34,6 +35,7 @@ export default {
       universe: 'Universe',
       earthStructure: "Earth's Interior",
       mars: 'Mars',
+      spacecraft: 'Spacecraft',
     },
     structureModes: {
       surface: 'Surface',
@@ -57,6 +59,7 @@ export default {
     hint: 'Drag to rotate · Scroll to zoom · Click a country for details',
     scaleHintEarth: 'Keep zooming out to reach the Solar System',
     scaleHintSpace: 'Zoom out for a larger scale · zoom in to go back',
+    craftHint: 'Drag to orbit · scroll to zoom',
     scaleHintUniverse: 'Largest scale · zoom in to return to the Galaxy',
     authorBlog: 'Blog',
 

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/useAppStore'
 import type { SpaceView } from '../store/useAppStore'
 import type { Country } from '../types'
+import { SPACECRAFT_MODELS } from '../data/spacecraftModels'
 
 const VIEWS: SpaceView[] = ['earth', 'moon', 'solar', 'galaxy', 'universe']
 
@@ -41,6 +42,8 @@ export default function Sidebar() {
   const setSidebarOpen = useAppStore((s) => s.setSidebarOpen)
   const view = useAppStore((s) => s.view)
   const setView = useAppStore((s) => s.setView)
+  const craftId = useAppStore((s) => s.craftId)
+  const setCraft = useAppStore((s) => s.setCraft)
   const countries = useAppStore((s) => s.countries)
   const showGdpBars = useAppStore((s) => s.showGdpBars)
   const toggleGdpBars = useAppStore((s) => s.toggleGdpBars)
@@ -189,6 +192,30 @@ export default function Sidebar() {
                 }`}
               >
                 {t(`views.${v}`)}
+              </button>
+            ))}
+          </div>
+
+          {/* 航天器 3D 展厅：每台单独进入，带部件标注与讲解 */}
+          <SectionTitle>{t('sections.spacecraft')}</SectionTitle>
+          <div className="grid grid-cols-2 gap-1.5 px-1.5">
+            {SPACECRAFT_MODELS.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => {
+                  setCraft(c.id)
+                  setSidebarOpen(false)
+                }}
+                className={`rounded-lg border px-3 py-2 text-left transition ${
+                  view === 'spacecraft' && craftId === c.id
+                    ? 'border-sky-500/70 bg-sky-500/10 text-sky-300'
+                    : 'border-slate-700/50 text-slate-300 hover:border-sky-500/40 hover:text-sky-200'
+                }`}
+              >
+                <span className="block text-sm leading-tight">{zh ? c.nameZh : c.nameEn}</span>
+                <span className="mt-0.5 block text-[10px] text-slate-500">
+                  {zh ? c.kindZh : c.kindEn}
+                </span>
               </button>
             ))}
           </div>

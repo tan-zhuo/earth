@@ -20,6 +20,7 @@ export default {
       explore: '深入探索',
       layers: '地球图层',
       features: '功能',
+      spacecraft: '航天器 3D',
     },
     layerGdpBars: 'GDP 柱状图',
     layerFlags: '国旗',
@@ -34,6 +35,7 @@ export default {
       universe: '宇宙',
       earthStructure: '地球内部',
       mars: '火星',
+      spacecraft: '航天器',
     },
     structureModes: {
       surface: '表面',
@@ -57,6 +59,7 @@ export default {
     hint: '拖动旋转 · 滚轮缩放 · 点击国家查看详情',
     scaleHintEarth: '持续缩小可进入太阳系',
     scaleHintSpace: '滚轮缩小进入更大尺度 · 放大返回上一级',
+    craftHint: '拖拽旋转 · 滚轮缩放',
     scaleHintUniverse: '已是最大尺度 · 滚轮放大返回银河系',
     authorBlog: '作者博客',
 
