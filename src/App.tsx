@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar'
 import InfoPanel from './components/InfoPanel'
 import TimeTravelBar from './components/TimeTravelBar'
 import RankingPanel from './components/RankingPanel'
+import TerrainPanel from './components/TerrainPanel'
 import MoonView from './components/space/MoonView'
 import SolarSystemView from './components/space/SolarSystemView'
 import GalaxyView from './components/space/GalaxyView'
@@ -83,6 +84,7 @@ export default function App() {
           <InfoPanel />
           <TimeTravelBar />
           <RankingPanel />
+          <TerrainPanel />
         </>
       )}
 

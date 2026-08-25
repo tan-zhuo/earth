@@ -4,6 +4,7 @@ import { useAppStore } from '../store/useAppStore'
 import type { SpaceView } from '../store/useAppStore'
 import type { Country } from '../types'
 import { SPACECRAFT_MODELS } from '../data/spacecraftModels'
+import { EXAGGERATION_MAX } from '../data/terrain'
 
 const VIEWS: SpaceView[] = ['earth', 'moon', 'solar', 'galaxy', 'universe']
 
@@ -53,6 +54,12 @@ export default function Sidebar() {
   const toggleRoutes = useAppStore((s) => s.toggleRoutes)
   const showSatellites = useAppStore((s) => s.showSatellites)
   const toggleSatellites = useAppStore((s) => s.toggleSatellites)
+  const showTerrain = useAppStore((s) => s.showTerrain)
+  const toggleTerrain = useAppStore((s) => s.toggleTerrain)
+  const showElevationTint = useAppStore((s) => s.showElevationTint)
+  const toggleElevationTint = useAppStore((s) => s.toggleElevationTint)
+  const exaggeration = useAppStore((s) => s.exaggeration)
+  const setExaggeration = useAppStore((s) => s.setExaggeration)
   const showRankings = useAppStore((s) => s.showRankings)
   const toggleRankings = useAppStore((s) => s.toggleRankings)
   const timeTravel = useAppStore((s) => s.timeTravel)
@@ -228,6 +235,33 @@ export default function Sidebar() {
               <ToggleRow label={t('layerFlags')} on={showFlags} onClick={toggleFlags} />
               <ToggleRow label={t('layerRoutes')} on={showRoutes} onClick={toggleRoutes} />
               <ToggleRow label={t('layerSatellites')} on={showSatellites} onClick={toggleSatellites} />
+
+              {/* 地形：真实高程（含海底），垂直夸张可调 */}
+              <SectionTitle>{t('sections.terrain')}</SectionTitle>
+              <ToggleRow label={t('layerTerrain')} on={showTerrain} onClick={toggleTerrain} />
+              {showTerrain && (
+                <div className="px-3 pt-1 pb-2">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>{t('exaggerationLabel')}</span>
+                    <span className="font-mono text-slate-300">×{exaggeration}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={EXAGGERATION_MAX}
+                    step={1}
+                    value={exaggeration}
+                    onChange={(e) => setExaggeration(Number(e.target.value))}
+                    className="mt-1 w-full accent-sky-500"
+                    aria-label={t('exaggerationLabel')}
+                  />
+                </div>
+              )}
+              <ToggleRow
+                label={t('layerElevationTint')}
+                on={showElevationTint}
+                onClick={toggleElevationTint}
+              />
 
               <SectionTitle>{t('sections.features')}</SectionTitle>
               <ToggleRow

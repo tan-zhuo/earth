@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Globe from 'globe.gl'
 import type { GlobeInstance } from 'globe.gl'
 import {
@@ -20,6 +20,10 @@ import { formatUsd } from '../utils/format'
 import { PALEO_ERAS } from '../data/paleoEras'
 import { PORTS, ROUTE_LEGS } from '../data/shippingRoutes'
 import type { Port } from '../data/shippingRoutes'
+import { attachTerrain } from './terrainShader'
+import type { TerrainController } from './terrainShader'
+import { EARTH_RADIUS_M, MAX_TERRAIN_M, loadElevationSampler } from '../data/terrain'
+import type { ElevationSampler } from '../data/terrain'
 
 type CountryFeature = Feature<Geometry, { name?: string }>
 
@@ -34,6 +38,12 @@ function altitudeForArea(area: number): number {
 }
 
 const OVERVIEW_ALTITUDE = 2.5
+
+/**
+ * 地形开启后，国界/国旗等矢量图层要抬到地形之上，否则山脉会从国界面里穿出来。
+ * 返回值是 globe.gl 的 altitude（地球半径的倍数）。
+ */
+const terrainCeiling = (exaggeration: number) => (MAX_TERRAIN_M * exaggeration) / EARTH_RADIUS_M
 
 /** 柱子颜色按世界银行收入分组着色（与详情面板徽章一致） */
 const BAR_COLORS: Record<string, string> = {
@@ -63,9 +73,21 @@ export default function GlobeView() {
   const showRoutes = useAppStore((s) => s.showRoutes)
   const view = useAppStore((s) => s.view)
   const showSatellites = useAppStore((s) => s.showSatellites)
+  const showTerrain = useAppStore((s) => s.showTerrain)
+  const exaggeration = useAppStore((s) => s.exaggeration)
+  const showElevationTint = useAppStore((s) => s.showElevationTint)
+  const setCursor = useAppStore((s) => s.setCursor)
   const featsRef = useRef<CountryFeature[]>([])
   const enteredEarthAtRef = useRef(0)
   const satLabelsRef = useRef<HTMLDivElement>(null)
+
+  /* ---- 地形 ---- */
+  const terrainRef = useRef<TerrainController | null>(null)
+  /** 高程采样器（CPU 侧，用于鼠标读数与标记贴地） */
+  const elevRef = useRef<ElevationSampler | null>(null)
+  /** 当前生效的垂直夸张倍数，供 globe.gl 的访问器（非 React 上下文）读取 */
+  const exaggRef = useRef(0)
+  const [elevReady, setElevReady] = useState(false)
 
   /* ---- 时间旅行贴图交叉淡化所需的引用 ---- */
   /** ma → 已解码并上传 GPU 的贴图（key 0 = 现代夜景） */
@@ -89,6 +111,16 @@ export default function GlobeView() {
   const countryOf = (f: CountryFeature): Country | undefined =>
     f.id != null ? byCcn3Ref.current.get(String(f.id).padStart(3, '0')) : undefined
 
+  /**
+   * 某点的地形抬升（globe.gl 的 altitude 单位）。
+   * 海面以下不下沉：国旗、港口这类标记始终留在海平面，不跟着沉进海盆。
+   */
+  const liftAt = (lat: number, lng: number) => {
+    const sampler = elevRef.current
+    if (!sampler || !exaggRef.current) return 0
+    return (Math.max(0, sampler(lat, lng)) * exaggRef.current) / EARTH_RADIUS_M
+  }
+
   /** 重新应用多边形样式（globe.gl 设置访问器即触发重绘） */
   const applyStyles = (world: GlobeInstance) => {
     const isHover = (f: object) => f === hoverRef.current
@@ -96,14 +128,17 @@ export default function GlobeView() {
       const c = countryOf(f as CountryFeature)
       return !!c && c.cca3 === selectedRef.current?.cca3
     }
+    // 地形开启时整层抬到最高峰之上，保证国界始终盖在地表上
+    const floor = Math.max(0.008, terrainCeiling(exaggRef.current) * 1.02)
     world
-      .polygonAltitude((f) => (isHover(f) || isSelected(f) ? 0.035 : 0.008))
+      .polygonAltitude((f) => (isHover(f) || isSelected(f) ? floor + 0.027 : floor))
       .polygonCapColor((f) => {
         if (isSelected(f)) return 'rgba(251, 191, 36, 0.55)' // 选中：琥珀色
         if (isHover(f)) return 'rgba(56, 189, 248, 0.45)' // 悬停：青色
         return 'rgba(56, 189, 248, 0.06)'
       })
-      .polygonSideColor(() => 'rgba(2, 6, 23, 0.35)')
+      // 地形抬高了国界层，侧壁跟着变高，颜色要淡一些才不至于像悬空的黑墙
+      .polygonSideColor(() => (floor > 0.008 ? 'rgba(2, 6, 23, 0.18)' : 'rgba(2, 6, 23, 0.35)'))
       .polygonStrokeColor((f) =>
         isHover(f) || isSelected(f) ? 'rgba(226, 232, 240, 0.9)' : 'rgba(148, 163, 184, 0.35)',
       )
@@ -200,6 +235,20 @@ export default function GlobeView() {
         hideSplash() // 边界失败也不阻塞进入应用
       })
 
+    // 指针位置的高程读数（节流 ~10Hz）：给地形面板提供“这里有多高/多深”
+    let lastSample = 0
+    const onPointerMove = (ev: PointerEvent) => {
+      if (!elevRef.current) return
+      if (performance.now() - lastSample < 90) return
+      lastSample = performance.now()
+      const rect = el.getBoundingClientRect()
+      const coords = world.toGlobeCoords(ev.clientX - rect.left, ev.clientY - rect.top)
+      setCursor(coords ? { ...coords, elevation: elevRef.current(coords.lat, coords.lng) } : null)
+    }
+    const onPointerLeave = () => setCursor(null)
+    el.addEventListener('pointermove', onPointerMove)
+    el.addEventListener('pointerleave', onPointerLeave)
+
     const ro = new ResizeObserver(() => {
       // 容器被隐藏（display:none）时尺寸为 0，跳过以免相机宽高比变为 NaN
       if (el.clientWidth > 0 && el.clientHeight > 0) {
@@ -210,7 +259,12 @@ export default function GlobeView() {
 
     return () => {
       window.clearInterval(skyTimer)
+      el.removeEventListener('pointermove', onPointerMove)
+      el.removeEventListener('pointerleave', onPointerLeave)
       ro.disconnect()
+      // 地形着色器挂在这个实例的材质上，随实例一起销毁（严格模式重挂载时会重建）
+      terrainRef.current?.dispose()
+      terrainRef.current = null
       world._destructor()
       globeRef.current = null
     }
@@ -242,6 +296,34 @@ export default function GlobeView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i18n.language, byCcn3])
 
+  // 地形起伏：真实高程（含海底）驱动顶点位移 + 山体阴影 + 可选高程着色。
+  // 两张贴图共约 1.8MB，只在首次开启时按需加载。
+  useEffect(() => {
+    const world = globeRef.current
+    if (!world) return
+    // 古地图与现代地形对不上，时间旅行期间压平
+    const exagg = showTerrain && !timeTravel ? exaggeration : 0
+    exaggRef.current = exagg
+
+    if (!terrainRef.current) {
+      if (!exagg) return
+      // 默认球面只有 90×45 段，撑不起山脉；开启地形时才细分到 720×360
+      world.globeCurvatureResolution(0.5)
+      terrainRef.current = attachTerrain(world.globeMaterial() as MeshPhongMaterial)
+      terrainRef.current.ready.catch((err) => console.error('地形贴图加载失败', err))
+      void loadElevationSampler()
+        .then((sampler) => {
+          elevRef.current = sampler
+          setElevReady(true) // 触发国旗/柱状图重算高度，贴到地形上
+        })
+        .catch((err) => console.error('高程数据解码失败', err))
+    }
+    terrainRef.current.setExaggeration(exagg)
+    terrainRef.current.setTint(showElevationTint && !timeTravel ? 1 : 0)
+    applyStyles(world)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showTerrain, exaggeration, showElevationTint, timeTravel])
+
   // GDP 柱状图层：高度 = sqrt(GDP) 归一化（兼顾大小国可见性），颜色按收入分组
   useEffect(() => {
     const world = globeRef.current
@@ -258,7 +340,15 @@ export default function GlobeView() {
       .pointsData(bars as unknown as object[])
       .pointLat((d) => (d as GdpBar).country.latlng[0])
       .pointLng((d) => (d as GdpBar).country.latlng[1])
-      .pointAltitude((d) => 0.015 + (Math.sqrt((d as GdpBar).gdp) / maxSqrt) * 0.55)
+      .pointAltitude((d) => {
+        const b = d as GdpBar
+        // 柱子从地表长出：底座抬到该国质心的地形高度
+        return (
+          0.015 +
+          liftAt(b.country.latlng[0], b.country.latlng[1]) +
+          (Math.sqrt(b.gdp) / maxSqrt) * 0.55
+        )
+      })
       .pointRadius(0.45)
       .pointColor((d) => {
         const pc = (d as GdpBar).gdpPerCapita
@@ -273,7 +363,8 @@ export default function GlobeView() {
           <div style="font-size:12px;color:#7dd3fc">GDP: ${formatUsd(b.gdp, langRef.current)} (${b.gdpYear})</div>
         </div>`
       })
-  }, [showGdpBars, gdpAll, countries, timeTravel])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showGdpBars, gdpAll, countries, timeTravel, exaggeration, showTerrain, elevReady])
 
   // HTML 标记图层：国旗（各国质心）+ 港口（航线开启时）。
   // 港口不用 three-globe 的文字图层——其矢量字体无中文字形，会渲染成问号。
@@ -297,7 +388,11 @@ export default function GlobeView() {
         const m = d as HtmlMarker
         return m.kind === 'flag' ? m.country.latlng[1] : m.port.lng
       })
-      .htmlAltitude(0.012)
+      .htmlAltitude((d) => {
+        const m = d as HtmlMarker
+        const [lat, lng] = m.kind === 'flag' ? m.country.latlng : [m.port.lat, m.port.lng]
+        return 0.012 + liftAt(lat, lng)
+      })
       .htmlElement((d) => {
         const m = d as HtmlMarker
         if (m.kind === 'flag') {
@@ -325,7 +420,7 @@ export default function GlobeView() {
         return el
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showFlags, showRoutes, countries, timeTravel, i18n.language])
+  }, [showFlags, showRoutes, countries, timeTravel, i18n.language, exaggeration, showTerrain, elevReady])
 
   // 航线图层：主要海运通道按枢纽港分段的动画弧线（港口标记在 HTML 图层中渲染）
   useEffect(() => {
@@ -372,7 +467,12 @@ export default function GlobeView() {
 
   /** 找到地球表面网格并克隆出透明叠加层（共享几何体保证贴图完全对齐） */
   const ensurePaleoOverlay = (world: GlobeInstance): { base: Mesh; overlay: Mesh } | null => {
-    if (paleoMeshRef.current) return paleoMeshRef.current
+    if (paleoMeshRef.current) {
+      // 开启地形后地球换过更密的几何体，叠加层要跟上，否则两层球面对不齐
+      const { base, overlay } = paleoMeshRef.current
+      if (overlay.geometry !== base.geometry) overlay.geometry = base.geometry
+      return paleoMeshRef.current
+    }
     let base: Mesh | undefined
     world.scene().traverse((o) => {
       const m = o as Mesh & { geometry?: { parameters?: { radius?: number } } }
@@ -390,7 +490,8 @@ export default function GlobeView() {
     if (baseMat.map) paleoTexRef.current.set(0, baseMat.map) // 现代夜景贴图入缓存
     const overlay = base.clone()
     // 不 clone 原材质（globe.gl 的材质含 null 颜色槽，clone 会崩溃），新建独立 Phong
-    const overlayMat = new MeshPhongMaterial({ transparent: true, opacity: 0 })
+    // depthWrite: false —— 叠加层始终停在海平面，写深度会挡住下沉的海底地形
+    const overlayMat = new MeshPhongMaterial({ transparent: true, opacity: 0, depthWrite: false })
     overlay.material = overlayMat
     overlay.renderOrder = 1
     base.parent?.add(overlay)

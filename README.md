@@ -35,6 +35,7 @@ npm run build    # 类型检查 + 生产构建 → dist/
 | 国旗 | flagcdn.com | 运行时按 ISO2 码取图 |
 | 国家边界 | world-atlas（Natural Earth 110m） | 随应用自托管（`public/data/`） |
 | 地球贴图 | three-globe 附带 NASA 贴图 | 随应用自托管（`public/textures/`） |
+| 地形高程 / 海底地形 | [NOAA ETOPO1](https://www.ncei.noaa.gov/products/etopo-global-relief-model)（1 弧分全球地形，公有领域） | **构建时**降采样为高程贴图 → `public/textures/earth-elevation.png`、`earth-relief.png` |
 | 政治体制 / 首都中文名 | 本地精选静态数据 `src/data/countryExtras.ts` | 构建时打包 |
 
 > 注意：REST Countries v3.1 API 已于 2026 年弃用（新版 v5 需注册），因此本项目不在运行时依赖它，改为构建时静态化上游数据集。更新国家数据：`node scripts/build-countries.mjs`。
@@ -47,15 +48,19 @@ earth/
 │   ├── data/countries-110m.json    # 国家边界 TopoJSON（Natural Earth 110m）
 │   └── textures/                   # 地球夜景贴图、星空背景
 ├── scripts/
-│   └── build-countries.mjs         # 构建时生成 src/data/countries.json
+│   ├── build-countries.mjs         # 构建时生成 src/data/countries.json
+│   └── build-terrain.mjs           # 构建时由 NOAA ETOPO1 生成高程/起伏贴图
 ├── src/
 │   ├── components/
 │   │   ├── GlobeView.tsx           # 3D 地球：渲染、悬停/选中高亮、飞行动画
 │   │   ├── Header.tsx              # 标题、返回总览、自转开关、语言切换
-│   │   └── InfoPanel.tsx           # 国家详情面板（桌面右侧滑入 / 移动端底部升起）
+│   │   ├── InfoPanel.tsx           # 国家详情面板（桌面右侧滑入 / 移动端底部升起）
+│   │   ├── terrainShader.ts        # 给地球材质注入位移/山体阴影/高程着色
+│   │   └── TerrainPanel.tsx        # 地形 HUD：指针处海拔/水深 + 高程色带图例
 │   ├── data/
 │   │   ├── countries.json          # 静态国家数据（脚本生成，已提交）
-│   │   └── countryExtras.ts        # 政体（中英）+ 首都中文名（本地精选）
+│   │   ├── countryExtras.ts        # 政体（中英）+ 首都中文名（本地精选）
+│   │   └── terrain.ts              # 高程贴图编码常量、色带、CPU 侧采样
 │   ├── i18n/                       # react-i18next 配置与中英文案
 │   ├── services/
 │   │   ├── cache.ts                # localStorage 缓存（版本号 + TTL）
@@ -93,6 +98,7 @@ earth/
 - 航线图层：全球主要海运贸易通道（按枢纽港分段的动画弧线，线宽/颜色表示运量等级）+ 港口标记
 - 详情面板经济板块：GDP 全球排名徽章、出口/进口总额（货物与服务，World Bank）
 - 国家历史：详情面板内嵌维基百科历史摘要（中英随语言切换，30 天缓存），附"继续阅读"链接
+- 地形起伏（NOAA ETOPO1）：山脉与海底地形按真实高程做顶点位移 + 山体阴影，垂直夸张 ×1~×25 可调；「高程着色」按海拔/水深上色并附色带图例；指针悬停实时读出该点海拔/水深
 - 时间旅行模式：从 7.5 亿年前的罗迪尼亚超大陆到现代，16 个地质时代的古地理 3D 演变，支持时间轴拖动与自动播放（古地理图 © C.R. Scotese PALEOMAP Project）
 - 中英文切换：自动检测浏览器语言、localStorage 记忆、面板内容同步切换
 - 响应式：桌面右侧面板 / 移动端底部抽屉
