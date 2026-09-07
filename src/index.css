@@ -12,6 +12,31 @@ body {
   overflow: hidden;
 }
 
+.country-panel {
+  height: 34dvh;
+  min-height: 240px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  transition: height 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.country-panel[data-size='half'] { height: 52dvh; }
+.country-panel[data-size='full'] { height: 82dvh; }
+@media (min-width: 768px) {
+  .country-panel, .country-panel[data-size] {
+    height: auto;
+    min-height: 0;
+  }
+}
+button:focus-visible, a:focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .country-panel, .panel-enter, .view-fade {
+    transition: none;
+    animation: none;
+  }
+}
+
 /* 详情面板入场动画：移动端从底部升起，桌面端从右侧滑入 */
 @keyframes slide-up {
   from {

@@ -57,7 +57,7 @@ const FRAG_PARS = /* glsl */ `
 uniform sampler2D tElevation;
 uniform sampler2D tRelief;
 uniform sampler2D tPalette;
-uniform sampler2D tMask;      // R = 悬停国家，G = 选中国家
+uniform sampler2D tMask;      // R = 悬停国家，G = 选中国家，B = 选中边界
 uniform float uTint;          // 高程着色混合比 0~1
 uniform float uShade;         // 山体阴影强度（0 = 关）
 uniform float uMask;          // 高亮总开关（0 = 关）
@@ -71,9 +71,10 @@ if (uTint > 0.0) {
 }
 if (uMask > 0.0) {
   // 高亮直接画在地表上：悬停青色、选中琥珀色，随地形起伏，不会悬空或被戳穿
-  vec2 m = texture2D(tMask, vTerrainUv).rg * uMask;
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.22, 0.74, 0.97), m.r * 0.45);
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.98, 0.75, 0.14), m.g * 0.55);
+  vec3 m = texture2D(tMask, vTerrainUv).rgb * uMask;
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.22, 0.74, 0.97), m.r * (1.0 - m.g) * 0.12);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.98, 0.75, 0.14), m.g * 0.05);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.98, 0.80, 0.36), m.b * 0.55);
 }
 if (uShade > 0.0) {
   vec2 texel = vec2(1.0 / ${TEX_W}.0, 1.0 / ${TEX_H}.0);

@@ -75,6 +75,11 @@ export default {
     authorBlog: '作者博客',
 
     panel: {
+      detailSize: '详情高度',
+      summary: '摘要',
+      half: '半屏',
+      full: '展开',
+
       officialName: '官方全称',
       basics: '基础信息',
       anthem: '国歌',

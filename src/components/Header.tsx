@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/useAppStore'
 
 const btnBase =
-  'rounded-lg border border-slate-700/60 bg-slate-900/60 px-3 py-1.5 text-xs font-medium text-slate-300 backdrop-blur transition hover:border-sky-500/60 hover:text-sky-300'
+  'inline-flex min-h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-slate-700/60 bg-slate-900/60 px-3 py-1.5 text-xs font-medium text-slate-300 backdrop-blur transition hover:border-sky-500/60 hover:text-sky-300'
 
 /* ---- 全屏：标准 API + Safari 的 webkit 前缀 ---- */
 type FsDocument = Document & {
@@ -63,7 +63,7 @@ export default function Header() {
   const zh = i18n.language.startsWith('zh')
 
   return (
-    <header className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between gap-3 p-4">
+    <header className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between gap-2 p-3 sm:p-4">
       <div className="pointer-events-auto flex items-center gap-2.5 select-none">
         <button
           onClick={() => setSidebarOpen(true)}
@@ -74,10 +74,10 @@ export default function Header() {
             <path d="M2 4h12M2 8h12M2 12h12" />
           </svg>
         </button>
-        <h1 className="flex items-center gap-2 text-xl font-bold tracking-wide text-slate-100">
+        <h1 className="flex shrink-0 items-center gap-2 whitespace-nowrap text-lg font-bold tracking-wide text-slate-100 sm:text-xl">
           <img src="/logo.svg" alt="Earth logo" className="h-8 w-8" />
           {t('appTitle')}
-          <span className="hidden text-xs font-normal text-slate-400 sm:inline">
+          <span className={`hidden text-xs font-normal text-slate-400 ${view !== 'earth' ? 'sm:inline' : ''}`}>
             {t(`views.${view}`)}
           </span>
         </h1>
@@ -85,13 +85,13 @@ export default function Header() {
 
       <div className="pointer-events-auto flex items-center gap-2">
         {selected && (
-          <button onClick={() => select(null)} className={btnBase}>
-            ← {t('backToGlobe')}
+          <button onClick={() => select(null)} className={btnBase} aria-label={t('backToGlobe')} title={t('backToGlobe')}>
+            <span aria-hidden="true">←</span><span className="ml-2 hidden sm:inline">{t('backToGlobe')}</span>
           </button>
         )}
         {timeTravel && (
-          <button onClick={toggleTimeTravel} className={btnBase}>
-            ← {t('exitTimeTravel')}
+          <button onClick={toggleTimeTravel} className={btnBase} aria-label={t('exitTimeTravel')}>
+            <span aria-hidden="true">←</span><span className="ml-2 hidden sm:inline">{t('exitTimeTravel')}</span>
           </button>
         )}
         {FS_SUPPORTED && (

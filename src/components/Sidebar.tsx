@@ -13,6 +13,8 @@ function ToggleRow({ label, on, onClick }: { label: string; on: boolean; onClick
   return (
     <button
       onClick={onClick}
+      role="switch"
+      aria-checked={on}
       className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-300 transition hover:bg-slate-800/70"
     >
       <span>{label}</span>
@@ -161,6 +163,63 @@ export default function Sidebar() {
             )}
           </div>
 
+          {/* 地球专属：图层与功能 */}
+          {view === 'earth' && (
+            <>
+              <SectionTitle>{t('sections.layers')}</SectionTitle>
+              <ToggleRow label={t('layerGdpBars')} on={showGdpBars} onClick={toggleGdpBars} />
+              <ToggleRow label={t('layerFlags')} on={showFlags} onClick={toggleFlags} />
+              <ToggleRow label={t('layerRoutes')} on={showRoutes} onClick={toggleRoutes} />
+              <ToggleRow label={t('layerSatellites')} on={showSatellites} onClick={toggleSatellites} />
+
+              {/* 地形：真实高程（含海底），垂直夸张可调 */}
+              <SectionTitle>{t('sections.terrain')}</SectionTitle>
+              <ToggleRow label={t('layerTerrain')} on={showTerrain} onClick={toggleTerrain} />
+              {showTerrain && (
+                <div className="px-3 pt-1 pb-2">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>{t('exaggerationLabel')}</span>
+                    <span className="font-mono text-slate-300">×{exaggeration}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={EXAGGERATION_MAX}
+                    step={1}
+                    value={exaggeration}
+                    onChange={(e) => setExaggeration(Number(e.target.value))}
+                    className="mt-1 w-full accent-sky-500"
+                    aria-label={t('exaggerationLabel')}
+                  />
+                </div>
+              )}
+              <ToggleRow
+                label={t('layerElevationTint')}
+                on={showElevationTint}
+                onClick={toggleElevationTint}
+              />
+
+              <SectionTitle>{t('sections.features')}</SectionTitle>
+              <ToggleRow
+                label={t('rankingsBtn')}
+                on={showRankings}
+                onClick={() => {
+                  toggleRankings()
+                  setSidebarOpen(false)
+                }}
+              />
+              <ToggleRow
+                label={t('timeTravel')}
+                on={timeTravel}
+                onClick={() => {
+                  toggleTimeTravel()
+                  setSidebarOpen(false)
+                }}
+              />
+              <ToggleRow label={t('autoRotateLabel')} on={autoRotate} onClick={toggleAutoRotate} />
+            </>
+          )}
+
           {/* 尺度视图 */}
           <SectionTitle>{t('sections.scale')}</SectionTitle>
           <div className="grid grid-cols-2 gap-1.5 px-1.5">
@@ -227,62 +286,7 @@ export default function Sidebar() {
             ))}
           </div>
 
-          {/* 地球专属：图层与功能 */}
-          {view === 'earth' && (
-            <>
-              <SectionTitle>{t('sections.layers')}</SectionTitle>
-              <ToggleRow label={t('layerGdpBars')} on={showGdpBars} onClick={toggleGdpBars} />
-              <ToggleRow label={t('layerFlags')} on={showFlags} onClick={toggleFlags} />
-              <ToggleRow label={t('layerRoutes')} on={showRoutes} onClick={toggleRoutes} />
-              <ToggleRow label={t('layerSatellites')} on={showSatellites} onClick={toggleSatellites} />
 
-              {/* 地形：真实高程（含海底），垂直夸张可调 */}
-              <SectionTitle>{t('sections.terrain')}</SectionTitle>
-              <ToggleRow label={t('layerTerrain')} on={showTerrain} onClick={toggleTerrain} />
-              {showTerrain && (
-                <div className="px-3 pt-1 pb-2">
-                  <div className="flex items-center justify-between text-[11px] text-slate-400">
-                    <span>{t('exaggerationLabel')}</span>
-                    <span className="font-mono text-slate-300">×{exaggeration}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={EXAGGERATION_MAX}
-                    step={1}
-                    value={exaggeration}
-                    onChange={(e) => setExaggeration(Number(e.target.value))}
-                    className="mt-1 w-full accent-sky-500"
-                    aria-label={t('exaggerationLabel')}
-                  />
-                </div>
-              )}
-              <ToggleRow
-                label={t('layerElevationTint')}
-                on={showElevationTint}
-                onClick={toggleElevationTint}
-              />
-
-              <SectionTitle>{t('sections.features')}</SectionTitle>
-              <ToggleRow
-                label={t('rankingsBtn')}
-                on={showRankings}
-                onClick={() => {
-                  toggleRankings()
-                  setSidebarOpen(false)
-                }}
-              />
-              <ToggleRow
-                label={t('timeTravel')}
-                on={timeTravel}
-                onClick={() => {
-                  toggleTimeTravel()
-                  setSidebarOpen(false)
-                }}
-              />
-              <ToggleRow label={t('autoRotateLabel')} on={autoRotate} onClick={toggleAutoRotate} />
-            </>
-          )}
         </div>
 
         {/* 底部：语言与链接 */}

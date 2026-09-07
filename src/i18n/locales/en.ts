@@ -75,6 +75,11 @@ export default {
     authorBlog: 'Blog',
 
     panel: {
+      detailSize: 'Detail height',
+      summary: 'Summary',
+      half: 'Half',
+      full: 'Full',
+
       officialName: 'Official name',
       basics: 'Basic facts',
       anthem: 'National Anthem',

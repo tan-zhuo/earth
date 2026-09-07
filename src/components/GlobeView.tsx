@@ -6,7 +6,7 @@ import {
   MeshBasicMaterial, BufferGeometry, Float32BufferAttribute, LineLoop, LineBasicMaterial, Vector3,
   Raycaster, Sphere, Vector2,
 } from 'three'
-import type { Mesh, Texture } from 'three'
+import type { Mesh, Texture, PerspectiveCamera } from 'three'
 import { EARTH_SATELLITES } from '../data/spacecraft'
 import { hideSplash } from '../splash'
 import { feature } from 'topojson-client'
@@ -43,6 +43,7 @@ function altitudeForArea(area: number): number {
 }
 
 const OVERVIEW_ALTITUDE = 2.5
+const overviewAltitude = () => window.innerWidth < 768 ? 4.2 : OVERVIEW_ALTITUDE
 
 /**
  * 地形开启后，国界/国旗等矢量图层要抬到地形之上，否则山脉会从国界面里穿出来。
@@ -215,8 +216,8 @@ export default function GlobeView() {
     world
       .polygonAltitude((f) => (isHover(f) || isSelected(f) ? floor + 0.027 : floor))
       .polygonCapColor((f) => {
-        if (isSelected(f)) return 'rgba(251, 191, 36, 0.55)' // 选中：琥珀色
-        if (isHover(f)) return 'rgba(56, 189, 248, 0.45)' // 悬停：青色
+        if (isSelected(f)) return 'rgba(251, 191, 36, 0.18)'
+        if (isHover(f)) return 'rgba(56, 189, 248, 0.16)'
         return terrain ? 'rgba(0, 0, 0, 0)' : 'rgba(56, 189, 248, 0.06)'
       })
       .polygonSideColor((f) =>
@@ -256,7 +257,7 @@ export default function GlobeView() {
       .globeImageUrl('/textures/earth-night.jpg')
       .backgroundImageUrl('/textures/night-sky.png')
       .atmosphereColor('#38bdf8')
-      .atmosphereAltitude(0.18)
+      .atmosphereAltitude(0.12)
       .polygonsTransitionDuration(200)
 
     globeRef.current = world
@@ -264,7 +265,7 @@ export default function GlobeView() {
     world.controls().autoRotate = true
     world.controls().autoRotateSpeed = 0.4
     world.controls().minDistance = MIN_DISTANCE_FLAT
-    world.pointOfView({ lat: 25, lng: 105, altitude: OVERVIEW_ALTITUDE }, 0)
+    world.pointOfView({ lat: 25, lng: 105, altitude: overviewAltitude() }, 0)
 
     // 自转的实现是相机环绕（OrbitControls.autoRotate），若星空天球留在场景里，
     // 星星会跟着流动，暴露出“镜头在飞”。把天球挂到相机上后星空相对视角静止，
@@ -277,6 +278,8 @@ export default function GlobeView() {
         return !!m.isMesh && m.material?.side === 1 // BackSide 的背景天球
       })
       if (!sky) return false
+      const skyMaterial = (sky as ThreeMesh).material as MeshBasicMaterial
+      skyMaterial.color.set('#404d61')
       const camera = world.camera()
       scene.add(camera) // 相机默认不在场景树中，加入后其子节点才会被渲染
       camera.add(sky)
@@ -398,24 +401,65 @@ export default function GlobeView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 选中变化：飞行 + 高亮 + 暂停自转
+  // 自转开关只改变旋转状态，保留用户当前的缩放和观察位置。
+  useEffect(() => {
+    const world = globeRef.current
+    if (world) world.controls().autoRotate = autoRotate && !selected
+  }, [autoRotate, selected])
+
+  // 选中变化才触发飞行。
   useEffect(() => {
     selectedRef.current = selected
     const world = globeRef.current
     if (!world) return
     applyStyles(world)
-    world.controls().autoRotate = autoRotate && !selected
     if (selected) {
       world.pointOfView(
-        { lat: selected.latlng[0], lng: selected.latlng[1], altitude: altitudeForArea(selected.area) },
+        { lat: selected.latlng[0], lng: selected.latlng[1], altitude: window.innerWidth < 768 ? Math.max(3.5, altitudeForArea(selected.area)) : altitudeForArea(selected.area) },
         1200,
       )
     } else {
       const pov = world.pointOfView()
-      world.pointOfView({ ...pov, altitude: OVERVIEW_ALTITUDE }, 1000)
+      world.pointOfView({ ...pov, altitude: overviewAltitude() }, 1000)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, autoRotate])
+  }, [selected])
+
+  // 将观察中心移到详情面板之外；投影偏移也用于正常的鼠标拾取。
+  useEffect(() => {
+    const world = globeRef.current
+    const el = containerRef.current
+    if (!world || !el || view !== 'earth') return
+    const panel = document.querySelector<HTMLElement>('[data-country-panel]')
+    let wasMobile = el.clientWidth < 768
+    const layout = () => {
+      const width = el.clientWidth
+      const height = el.clientHeight
+      if (!width || !height) return
+      const mobile = width < 768
+      if (mobile !== wasMobile) {
+        wasMobile = mobile
+        const pov = world.pointOfView()
+        world.pointOfView({ ...pov, altitude: selected
+          ? mobile ? Math.max(3.5, altitudeForArea(selected.area)) : altitudeForArea(selected.area)
+          : overviewAltitude() }, 0)
+      }
+      const camera = world.camera() as PerspectiveCamera
+      if (!selected || !panel) {
+        camera.clearViewOffset()
+      } else {
+        const bounds = panel.getBoundingClientRect()
+        camera.setViewOffset(width, height, mobile ? 0 : (width - bounds.left) / 2,
+          mobile ? Math.max(0, height - bounds.top - 64) / 2 : 0, width, height)
+      }
+      camera.updateProjectionMatrix()
+    }
+    const observer = new ResizeObserver(layout)
+    observer.observe(el)
+    if (panel) observer.observe(panel)
+    layout()
+    return () => observer.disconnect()
+  }, [selected, view])
 
   // 语言切换或国家数据就绪后，刷新悬停标签语言
   useEffect(() => {
@@ -472,7 +516,7 @@ export default function GlobeView() {
       exaggeration: exagg,
       toXYZ: (lat, lng, alt) => world.getCoords(lat, lng, alt),
       color: '#94a3b8',
-      opacity: 0.45,
+      opacity: 0.28,
     })
     scene.add(lines)
     bordersRef.current = lines
@@ -848,7 +892,10 @@ export default function GlobeView() {
       const pov = world.pointOfView()
       const lat = Number.isFinite(pov.lat) ? pov.lat : 25
       const lng = Number.isFinite(pov.lng) ? pov.lng : 105
-      world.pointOfView({ lat, lng, altitude: OVERVIEW_ALTITUDE }, 0)
+      const target = useAppStore.getState().selected
+      world.pointOfView(target
+        ? { lat: target.latlng[0], lng: target.latlng[1], altitude: window.innerWidth < 768 ? Math.max(3.5, altitudeForArea(target.area)) : altitudeForArea(target.area) }
+        : { lat, lng, altitude: overviewAltitude() }, 0)
       // 清掉 OrbitControls 残留的阻尼动量（离开时的滚轮/拖拽惯性会在恢复渲染后继续把相机往外推）
       const controls = world.controls()
       const damping = controls.enableDamping

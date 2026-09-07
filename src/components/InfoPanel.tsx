@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/useAppStore'
@@ -77,6 +77,10 @@ export default function InfoPanel() {
   const select = useAppStore((s) => s.select)
   const gdpAll = useAppStore((s) => s.gdpAll)
   const countries = useAppStore((s) => s.countries)
+
+  const [sheetSize, setSheetSize] = useState<'summary' | 'half' | 'full'>('summary')
+  const swipeStart = useRef<number | null>(null)
+  useEffect(() => { setSheetSize('summary') }, [selected?.cca3])
 
   const [stats, setStats] = useState<WbStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
@@ -179,13 +183,43 @@ export default function InfoPanel() {
   return (
     <aside
       key={selected.cca3}
-      className="panel-enter fixed inset-x-0 bottom-0 z-20 max-h-[72vh] overflow-y-auto rounded-t-2xl border-t border-slate-700/50 bg-slate-900/85 backdrop-blur-xl md:inset-x-auto md:top-16 md:right-4 md:bottom-4 md:max-h-none md:w-[400px] md:rounded-2xl md:border"
+      data-country-panel
+      data-size={sheetSize}
+      aria-label={name}
+      className="country-panel fixed inset-x-0 bottom-0 z-20 flex flex-col overflow-hidden rounded-t-2xl border-t border-slate-700/50 bg-slate-900/95 shadow-2xl backdrop-blur-xl md:inset-x-auto md:top-20 md:right-4 md:bottom-4 md:w-[400px] md:rounded-2xl md:border"
     >
+      <div className="shrink-0 border-b border-slate-700/40 px-4 pb-2 md:hidden"
+        onPointerDown={(e) => {
+          if ((e.target as HTMLElement).closest('button')) return
+          swipeStart.current = e.clientY
+          e.currentTarget.setPointerCapture(e.pointerId)
+        }}
+        onPointerUp={(e) => {
+          if (swipeStart.current !== null && Math.abs(e.clientY - swipeStart.current) > 30) {
+            const sizes = ['summary', 'half', 'full'] as const
+            const direction = e.clientY < swipeStart.current ? 1 : -1
+            setSheetSize(sizes[Math.max(0, Math.min(2, sizes.indexOf(sheetSize) + direction))])
+          }
+          swipeStart.current = null
+        }}
+        onPointerCancel={() => { swipeStart.current = null }}
+        style={{ touchAction: 'none' }}>
+        <div className="mx-auto my-2 h-1 w-9 rounded-full bg-slate-600" />
+        <div className="flex gap-1" role="group" aria-label={t('panel.detailSize')}>
+          {(['summary', 'half', 'full'] as const).map((size) => (
+            <button key={size} onClick={() => setSheetSize(size)} aria-pressed={sheetSize === size}
+              className={`min-h-9 flex-1 rounded-lg text-xs transition ${sheetSize === size ? 'bg-sky-400/10 text-sky-300' : 'text-slate-400 hover:text-slate-200'}`}>
+              {t(`panel.${size}`)}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       {/* 头部：国旗 + 名称 */}
-      <div className="relative border-b border-slate-700/40 p-5">
+      <div className="relative border-b border-slate-700/40 p-4 pr-14 md:p-5">
         <button
           onClick={() => select(null)}
-          className="absolute top-4 right-4 rounded-full p-1.5 text-slate-400 transition hover:bg-slate-700/50 hover:text-slate-100"
+          className="absolute top-2 right-2 flex h-11 w-11 items-center justify-center rounded-full p-1.5 text-slate-400 transition hover:bg-slate-700/50 hover:text-slate-100"
           aria-label={t('backToGlobe')}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
@@ -195,40 +229,29 @@ export default function InfoPanel() {
         <img
           src={selected.flagSvg}
           alt={name}
-          className="mb-3 h-16 rounded-md border border-slate-600/50 shadow-lg"
+          className="float-left mr-3 h-10 max-w-20 rounded-md md:float-none md:mb-3 md:mr-0 md:h-16 md:max-w-none border border-slate-600/50 shadow-lg"
         />
-        <h2 className="text-2xl font-bold text-slate-100">{name}</h2>
+        <h2 className="text-xl font-bold text-slate-100 md:text-2xl">{name}</h2>
         <p className="text-sm text-slate-400">{altName}</p>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className={`mt-3 clear-both text-xs text-slate-400 ${sheetSize === 'summary' ? 'hidden md:block' : ''}`}>
           {t('panel.officialName')}：{official}
         </p>
       </div>
 
       <div className="space-y-3 p-4">
-        {(() => {
-          const anthem = anthems[selected.cca3]
-          if (!anthem || (!anthem.nameEn && !anthem.nameZh)) return null
-          return (
-            <Section title={t('panel.anthem')}>
-              <p className="text-sm font-medium text-slate-200">
-                {zh ? (anthem.nameZh ?? anthem.nameEn) : (anthem.nameEn ?? anthem.nameZh)}
-              </p>
-              {anthem.audio ? (
-                <audio
-                  key={selected.cca3}
-                  controls
-                  preload="none"
-                  src={anthem.audio}
-                  className="mt-2 h-9 w-full"
-                />
-              ) : (
-                <p className="mt-1 text-xs text-slate-500">{t('panel.anthemNoAudio')}</p>
-              )}
-              <p className="mt-1.5 text-[10px] text-slate-600">{t('panel.anthemSource')}</p>
-            </Section>
-          )
-        })()}
-
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 md:hidden">
+          {[
+            [t('panel.capital'), capital],
+            [t('panel.population'), stats?.population != null ? formatBigNumber(stats.population, lang) : pendingDash],
+            [t('panel.area'), `${formatBigNumber(selected.area, lang)} km²`],
+            [t('panel.gdp'), stats?.gdp != null ? formatUsd(stats.gdp, lang) : pendingDash],
+          ].map(([label, value], index) => (
+            <div key={index}>
+              <p className="text-[11px] text-slate-400">{label}</p>
+              <p className="mt-0.5 text-sm font-medium tracking-normal text-slate-100">{value}</p>
+            </div>
+          ))}
+        </div>
         <Section title={t('panel.basics')}>
           <Row label={t('panel.capital')} value={capital} />
           <Row
@@ -394,6 +417,30 @@ export default function InfoPanel() {
           <p className="mt-2 text-[10px] text-slate-600">{t('panel.factbookNote')}</p>
         </Section>
 
+        {(() => {
+          const anthem = anthems[selected.cca3]
+          if (!anthem || (!anthem.nameEn && !anthem.nameZh)) return null
+          return (
+            <Section title={t('panel.anthem')}>
+              <p className="text-sm font-medium text-slate-200">
+                {zh ? (anthem.nameZh ?? anthem.nameEn) : (anthem.nameEn ?? anthem.nameZh)}
+              </p>
+              {anthem.audio ? (
+                <audio
+                  key={selected.cca3}
+                  controls
+                  preload="none"
+                  src={anthem.audio}
+                  className="mt-2 h-9 w-full"
+                />
+              ) : (
+                <p className="mt-1 text-xs text-slate-500">{t('panel.anthemNoAudio')}</p>
+              )}
+              <p className="mt-1.5 text-[10px] text-slate-600">{t('panel.anthemSource')}</p>
+            </Section>
+          )
+        })()}
+
         <Section title={t('panel.politics')}>
           <Row
             label={t('panel.government')}
@@ -420,6 +467,7 @@ export default function InfoPanel() {
             <p className="text-sm text-slate-500">{t('panel.historyUnavailable')}</p>
           )}
         </Section>
+      </div>
       </div>
     </aside>
   )

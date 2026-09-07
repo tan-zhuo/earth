@@ -5,7 +5,7 @@
  * 要么被山脉戳穿。这里改成把国家轮廓画进一张等经纬掩码贴图，
  * 由地球着色器直接在地表上着色 —— 高亮就长在地形上，任何倍数、任何视角都不会错位。
  *
- * 通道分工：R = 悬停，G = 选中（同一个国家两者可叠加）。
+ * 通道分工：R = 悬停，G = 选中填充，B = 选中边界。
  */
 import { CanvasTexture, LinearFilter } from 'three'
 import type { Feature, Geometry, Position } from 'geojson'
@@ -49,6 +49,11 @@ export function createTerrainMask(): TerrainMask {
       ctx.beginPath()
       tracePolygon(poly)
       ctx.fill('evenodd') // 外环减内环（飞地/湖泊）
+      if (color === '#00ff00') {
+        ctx.strokeStyle = '#0000ff'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+      }
     }
   }
 
