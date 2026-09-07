@@ -79,3 +79,22 @@ button:focus-visible, a:focus-visible {
     animation: slide-in-right 0.35s ease both;
   }
 }
+
+/* Space views share a clear stage, compact controls and a responsive reading panel. */
+.space-stage { position: absolute; inset: 198px 12px 278px; z-index: 0; }
+.space-navigation { position: fixed; top: 70px; left: 12px; right: 12px; z-index: 20; }
+.space-control { min-height: 36px; padding: 6px 10px; border-radius: 8px; white-space: nowrap; font-size: 12px; color: #94a3b8; transition: background 150ms, color 150ms; }
+.space-control:hover { color: #e2e8f0; background: #1e293b; }
+.space-control[aria-pressed='true'] { background: #38bdf81a; color: #7dd3fc; }
+.space-info { position: fixed; bottom: 48px; left: 12px; right: 12px; z-index: 20; max-height: 220px; display: flex; flex-direction: column; border: 1px solid #33415599; border-radius: 16px; background: #0f172af2; backdrop-filter: blur(16px); overflow: hidden; }
+.space-info.is-expanded { max-height: min(65dvh, calc(100dvh - 180px)); }
+.space-layers { position: fixed; top: 150px; left: 12px; right: 12px; z-index: 20; display: flex; overflow-x: auto; }
+.space-landmark { position: absolute; pointer-events: auto; transform: translate(-50%, calc(-100% - 8px)); border: 1px solid #33415599; border-radius: 20px; padding: 6px 10px; font: 11px system-ui; color: #cbd5e1; background: #020617b3; white-space: nowrap; cursor: pointer; }
+.space-landmark::before { content: ''; display: inline-block; width: 5px; height: 5px; margin-right: 6px; vertical-align: middle; border-radius: 50%; background: var(--marker); box-shadow: 0 0 8px var(--marker); }
+.space-landmark:hover, .space-landmark[aria-pressed='true'] { color: #fff; border-color: var(--marker); background: #0f172ae6; }
+@media (min-width: 768px) {
+  .space-stage { inset: 152px 396px 100px 16px; }
+  .space-navigation { top: 76px; left: 20px; right: 400px; }
+  .space-info, .space-info.is-expanded { left: auto; top: 90px; right: 16px; bottom: 60px; width: 360px; max-height: none; }
+  .space-layers { top: auto; left: 20px; right: 400px; bottom: 48px; justify-content: center; }
+}

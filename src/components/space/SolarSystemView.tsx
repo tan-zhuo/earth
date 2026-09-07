@@ -1,16 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   AmbientLight, BackSide, CanvasTexture, DoubleSide, Group, Line, LineBasicMaterial, LineLoop,
-  Mesh, MeshBasicMaterial, MeshPhongMaterial, PerspectiveCamera, PointLight, Raycaster,
-  RingGeometry, Scene, SphereGeometry, Sprite, SpriteMaterial, SRGBColorSpace, TextureLoader,
-  Vector2, Vector3, WebGLRenderer, BufferGeometry, Float32BufferAttribute,
+  Mesh, MeshBasicMaterial, MeshPhongMaterial, PointLight, Raycaster, Points, PointsMaterial,
+  RingGeometry, SphereGeometry, Sprite, SpriteMaterial, SRGBColorSpace, TextureLoader,
+  Vector2, Vector3, BufferGeometry, Float32BufferAttribute,
 } from 'three'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { useTranslation } from 'react-i18next'
-import { PLANETS, SUN_FACTS, SOLAR_NOTE } from '../../data/space'
+import { PLANETS, SOLAR_NOTE } from '../../data/space'
 import { DEEP_SPACE_PROBES } from '../../data/spacecraft'
-import { useAppStore } from '../../store/useAppStore'
-import FactCard from './FactCard'
+import SpaceExplorer, { useExplorer } from './SpaceExplorer'
+import { SOLAR_ITEMS, SOLAR_LAYERS } from '../../data/spaceExplore'
+import { createSpaceScene, createSpaceLabels, seededRandom } from './spaceScene'
 
 /** 生成太阳光晕贴图（径向渐变，避免外部资源） */
 function makeGlowTexture(): CanvasTexture {
@@ -30,49 +30,22 @@ function makeGlowTexture(): CanvasTexture {
 export default function SolarSystemView() {
   const containerRef = useRef<HTMLDivElement>(null)
   const labelsRef = useRef<HTMLDivElement>(null)
-  const [selectedId, setSelectedId] = useState<string>('sun')
   const { i18n } = useTranslation()
   const zh = i18n.language.startsWith('zh')
+  const explorer = useExplorer(SOLAR_LAYERS)
+  const { live } = explorer
 
   useEffect(() => {
     const el = containerRef.current
     const labelLayer = labelsRef.current
     if (!el || !labelLayer) return
 
-    const scene = new Scene()
-    const camera = new PerspectiveCamera(50, el.clientWidth / el.clientHeight, 0.1, 8000)
-    camera.position.set(0, 90, 210)
-    const renderer = new WebGLRenderer({ antialias: true })
-    renderer.setSize(el.clientWidth, el.clientHeight)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    el.appendChild(renderer.domElement)
-
-    const controls = new OrbitControls(camera, renderer.domElement)
-    controls.enableDamping = true
-    controls.minDistance = 40
-    controls.maxDistance = 600
-
-    // 滚轮穿越尺度：缩到最小回到地球，拉到最大进入银河系。
-    // 入场 800ms 免触发（避开进场时残留的滚动惯性），到点后立刻按当前距离复判一次：
-    // 否则这段时间里若已经越过阈值，change 事件早已停发，用户得再滚一次才生效。
-    let armed = false
-    let jumped = false
-    const onScaleCross = () => {
-      if (jumped || !armed) return
-      const d = camera.position.length()
-      if (d <= 44) {
-        jumped = true
-        useAppStore.getState().setView('earth')
-      } else if (d >= 590) {
-        jumped = true
-        useAppStore.getState().setView('galaxy')
-      }
-    }
-    controls.addEventListener('change', onScaleCross)
-    const armTimer = window.setTimeout(() => {
-      armed = true
-      onScaleCross()
-    }, 800)
+    const runtime = createSpaceScene(el, live, 230)
+    const { scene, camera, renderer } = runtime
+    const random = seededRandom(8)
+    const labels = createSpaceLabels(labelLayer, camera, id => explorer.select(id))
+    const orbitGroup = new Group(), beltGroup = new Group(), guideGroup = new Group(), probeGroup = new Group()
+    scene.add(orbitGroup, beltGroup, guideGroup, probeGroup)
 
     scene.add(new AmbientLight(0xffffff, 0.5))
     const sunLight = new PointLight(0xfff3d6, 2200, 0, 1.6)
@@ -82,17 +55,20 @@ export default function SolarSystemView() {
     const loadTex = (url: string) => {
       const t = loader.load(url)
       t.colorSpace = SRGBColorSpace
+      runtime.textures.add(t)
       return t
     }
     /** 贴图异步加载期间先用近似底色渲染，避免天体黑屏闪烁 */
     const texturedPhong = (url: string, baseColor: number) => {
       const mat = new MeshPhongMaterial({ color: baseColor, shininess: 8 })
-      loader.load(url, (t) => {
+      const texture = loader.load(url, (t) => {
+        if (runtime.isDisposed()) { t.dispose(); return }
         t.colorSpace = SRGBColorSpace
         mat.map = t
         mat.color.set(0xffffff)
         mat.needsUpdate = true
       })
+      runtime.textures.add(texture)
       return mat
     }
     const PLANET_BASE_COLORS: Record<string, number> = {
@@ -103,18 +79,20 @@ export default function SolarSystemView() {
     // 星空背景天球
     const sky = new Mesh(
       new SphereGeometry(4000, 32, 32),
-      new MeshBasicMaterial({ map: loadTex('/textures/night-sky.png'), side: BackSide }),
+      new MeshBasicMaterial({ map: loadTex('/textures/night-sky.png'), side: BackSide, color: '#354054' }),
     )
     scene.add(sky)
 
     // 太阳 + 光晕（贴图未就绪前用橙色底色）
     const sunMat = new MeshBasicMaterial({ color: 0xffa030 })
-    loader.load('/space/sun.jpg', (t) => {
+    const sunTexture = loader.load('/space/sun.jpg', (t) => {
+      if (runtime.isDisposed()) { t.dispose(); return }
       t.colorSpace = SRGBColorSpace
       sunMat.map = t
       sunMat.color.set(0xffffff)
       sunMat.needsUpdate = true
     })
+    runtime.textures.add(sunTexture)
     const sun = new Mesh(new SphereGeometry(16, 64, 64), sunMat)
     sun.userData.id = 'sun'
     scene.add(sun)
@@ -174,38 +152,32 @@ export default function SolarSystemView() {
       }
       const orbitGeo = new BufferGeometry()
       orbitGeo.setAttribute('position', new Float32BufferAttribute(pts, 3))
-      scene.add(new LineLoop(orbitGeo, new LineBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.5 })))
+      orbitGroup.add(new LineLoop(orbitGeo, new LineBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.5 })))
 
       planetMeshes.push({
         id: p.id, mesh, group, dist: p.vDist,
         // 角速度按公转周期缩放（幂压缩让外行星仍可见运动）
         speed: 0.25 / Math.pow(p.periodYears, 0.65),
-        angle: Math.random() * Math.PI * 2,
+        angle: PLANETS.indexOf(p) * 2.39996,
       })
     }
 
-    // 屏幕投影标签
-    const labelEls = new Map<string, HTMLSpanElement>()
-    const mkLabel = (id: string, text: string) => {
-      const span = document.createElement('span')
-      span.textContent = text
-      span.style.cssText =
-        'position:absolute;transform:translate(-50%,-140%);font-size:11px;font-family:system-ui;' +
-        'color:#cbd5e1;text-shadow:0 0 4px rgba(2,6,23,.9);pointer-events:none;white-space:nowrap'
-      labelLayer.appendChild(span)
-      labelEls.set(id, span)
-    }
-    mkLabel('sun', zh ? '太阳' : 'Sun')
+    labels.add('sun', zh ? '太阳' : 'Sun', '#fbbf24', () => new Vector3())
     for (const p of PLANETS) {
-      const enterable = p.id === 'earth' || p.id === 'mars'
-      mkLabel(
-        p.id,
-        enterable
-          ? `${zh ? p.nameZh : p.nameEn} · ${zh ? '点击进入' : 'click to enter'}`
-          : zh
-            ? p.nameZh
-            : p.nameEn,
-      )
+      const planet = planetMeshes.find(pm => pm.id === p.id)!
+      labels.add(p.id, zh ? p.nameZh : p.nameEn, '#93c5fd', () => planet.mesh.getWorldPosition(new Vector3()))
+    }
+    // Thin belts give the scene a readable transition from inner rocky worlds to its icy outskirts.
+    for (const belt of [{ id: 'asteroids', inner: 80, outer: 90, color: '#b9aa93', count: 1600 }, { id: 'kuiper', inner: 207, outer: 236, color: '#8998cf', count: 2600 }]) {
+      const positions: number[] = []
+      for (let i = 0; i < belt.count; i++) {
+        const angle = random() * Math.PI * 2, r = belt.inner + random() * (belt.outer - belt.inner)
+        positions.push(Math.cos(angle) * r, (random() - 0.5) * 3, Math.sin(angle) * r)
+      }
+      const points = new Points(new BufferGeometry().setAttribute('position', new Float32BufferAttribute(positions, 3)), new PointsMaterial({ color: belt.color, size: 0.55, transparent: true, opacity: 0.6, depthWrite: false }))
+      beltGroup.add(points)
+      labels.add(belt.id, zh ? (belt.id === 'asteroids' ? '小行星带' : '柯伊伯带') : (belt.id === 'asteroids' ? 'Asteroid belt' : 'Kuiper belt'), belt.color,
+        () => new Vector3(-belt.inner * 0.8, 0, belt.inner * 0.6), 'belts')
     }
 
     // 日地拉格朗日点 L1–L5（L1/L2 离地球仅 0.01 AU，展示距离经夸大）
@@ -219,22 +191,16 @@ export default function SolarSystemView() {
     const lagrangeMeshes = new Map<string, Mesh>()
     for (const ld of lagrangeDefs) {
       const m = new Mesh(new SphereGeometry(0.7, 16, 16), new MeshBasicMaterial({ color: 0xa5f3fc }))
-      scene.add(m)
+      guideGroup.add(m)
       lagrangeMeshes.set(ld.id, m)
-      mkLabel(ld.id, ld.text)
-      const span = labelEls.get(ld.id)
-      if (span) {
-        span.style.color = '#a5f3fc'
-        span.style.fontSize = '10px'
-      }
+      labels.add('lagrange', ld.text, '#a5f3fc', () => m.position.clone(), 'guides')
     }
     // 深空探测器：方向示意 + 真实距离标签 + 轨迹线
-    const probePositions: [string, Vector3][] = []
     for (const probe of DEEP_SPACE_PROBES) {
       const pos = new Vector3(...probe.pos)
       const dot = new Mesh(new SphereGeometry(1.1, 12, 12), new MeshBasicMaterial({ color: 0xe2e8f0 }))
       dot.position.copy(pos)
-      scene.add(dot)
+      probeGroup.add(dot)
       // 从内太阳系方向拉出的轨迹线
       const from = pos.clone().normalize().multiplyScalar(Math.min(60, pos.length() * 0.35))
       const trackGeo = new BufferGeometry()
@@ -242,16 +208,10 @@ export default function SolarSystemView() {
         'position',
         new Float32BufferAttribute([from.x, from.y, from.z, pos.x, pos.y, pos.z], 3),
       )
-      scene.add(
+      probeGroup.add(
         new Line(trackGeo, new LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.3 })),
       )
-      mkLabel(probe.id, `${zh ? probe.nameZh : probe.nameEn} · ${zh ? probe.tagZh : probe.tagEn}`)
-      const span = labelEls.get(probe.id)
-      if (span) {
-        span.style.color = '#cbd5e1'
-        span.style.fontSize = '10px'
-      }
-      probePositions.push([probe.id, pos])
+      labels.add(probe.id, zh ? probe.nameZh : probe.nameEn, '#cbd5e1', () => pos.clone(), 'probes')
     }
 
     /** 按地球当前轨道角更新 L1–L5 位置 */
@@ -260,7 +220,6 @@ export default function SolarSystemView() {
       const set = (id: string, v: Vector3) => {
         const m = lagrangeMeshes.get(id)
         if (m) m.position.copy(v)
-        projectLabel(id, v)
       }
       set('l1', dir.clone().multiplyScalar(earthDist - 8))
       set('l2', dir.clone().multiplyScalar(earthDist + 8))
@@ -269,18 +228,6 @@ export default function SolarSystemView() {
         new Vector3(Math.cos(earthAngle + da), 0, Math.sin(earthAngle + da)).multiplyScalar(earthDist)
       set('l4', rot(-Math.PI / 3)) // 轨道前方 60°
       set('l5', rot(Math.PI / 3)) // 轨道后方 60°
-    }
-
-    const projectLabel = (id: string, worldPos: Vector3) => {
-      const span = labelEls.get(id)
-      if (!span) return
-      const v = worldPos.clone().project(camera)
-      const visible = v.z < 1
-      span.style.display = visible ? 'block' : 'none'
-      if (visible) {
-        span.style.left = `${((v.x + 1) / 2) * el.clientWidth}px`
-        span.style.top = `${((1 - v.y) / 2) * el.clientHeight}px`
-      }
     }
 
     // 点击拾取
@@ -304,76 +251,61 @@ export default function SolarSystemView() {
     renderer.domElement.style.cursor = 'grab'
     renderer.domElement.addEventListener('mousemove', onMove)
 
-    const onClick = (ev: MouseEvent) => {
+    let down: { x: number; y: number } | null = null
+    const onDown = (ev: PointerEvent) => { down = { x: ev.clientX, y: ev.clientY } }
+    const onUp = (ev: PointerEvent) => {
+      if (!down || Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 6) { down = null; return }
+      down = null
       const id = pickAt(ev.clientX, ev.clientY)
-      if (!id) return
-      // 点击地球/火星：进入对应天体视图
-      if (id === 'earth') {
-        useAppStore.getState().setView('earth')
-        return
-      }
-      if (id === 'mars') {
-        useAppStore.getState().setView('mars')
-        return
-      }
-      setSelectedId(id)
+      if (id) explorer.select(id)
     }
-    renderer.domElement.addEventListener('click', onClick)
+    const onCancel = () => { down = null }
+    renderer.domElement.addEventListener('pointerdown', onDown)
+    renderer.domElement.addEventListener('pointerup', onUp)
+    renderer.domElement.addEventListener('pointercancel', onCancel)
 
-    let raf = 0
-    let last = performance.now()
-    const tick = (now: number) => {
-      const dt = (now - last) / 1000
-      last = now
+    runtime.setFocusProvider(id => {
+      const planet = planetMeshes.find(p => p.id === id)
+      if (planet) return { position: planet.mesh.getWorldPosition(new Vector3()), distance: Math.max(PLANETS.find(p => p.id === id)!.vRadius * 9, 18) }
+      if (id === 'sun') return { position: new Vector3(), distance: 95 }
+      const probe = DEEP_SPACE_PROBES.find(p => p.id === id)
+      if (probe) return { position: new Vector3(...probe.pos), distance: 35 }
+      if (id === 'lagrange') return { position: lagrangeMeshes.get('l2')!.position.clone(), distance: 65 }
+      const r = id === 'asteroids' ? 85 : id === 'kuiper' ? 220 : 0
+      return r ? { position: new Vector3(-r * 0.8, 0, r * 0.6), distance: 80 } : null
+    })
+    runtime.start(dt => {
+      const settings = live.current
+      orbitGroup.visible = settings.layers.orbits
+      beltGroup.visible = settings.layers.belts
+      guideGroup.visible = settings.layers.guides
+      probeGroup.visible = settings.layers.probes
       sun.rotation.y += dt * 0.02
       for (const pm of planetMeshes) {
-        pm.angle += dt * pm.speed
+        pm.angle += dt * pm.speed * 0.25
         pm.mesh.position.set(Math.cos(pm.angle) * pm.dist, 0, Math.sin(pm.angle) * pm.dist)
         pm.mesh.rotation.y += dt * 0.3
-        projectLabel(pm.id, pm.mesh.getWorldPosition(new Vector3()))
         if (pm.id === 'earth') updateLagrange(pm.angle, pm.dist)
+        const mat = pm.mesh.material as MeshPhongMaterial
+        mat.emissive.set(settings.selected === pm.id ? '#18334a' : '#000000')
       }
-      projectLabel('sun', new Vector3(0, 0, 0))
-      for (const [id, pos] of probePositions) projectLabel(id, pos)
-      controls.update()
-      renderer.render(scene, camera)
-      raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-
-    const ro = new ResizeObserver(() => {
-      camera.aspect = el.clientWidth / el.clientHeight
-      camera.updateProjectionMatrix()
-      renderer.setSize(el.clientWidth, el.clientHeight)
-    })
-    ro.observe(el)
-
+      scene.updateMatrixWorld()
+    }, () => labels.update(live.current))
     return () => {
-      cancelAnimationFrame(raf)
-      window.clearTimeout(armTimer)
-      ro.disconnect()
-      controls.removeEventListener('change', onScaleCross)
-      renderer.domElement.removeEventListener('click', onClick)
+      renderer.domElement.removeEventListener('pointerdown', onDown)
+      renderer.domElement.removeEventListener('pointerup', onUp)
+      renderer.domElement.removeEventListener('pointercancel', onCancel)
       renderer.domElement.removeEventListener('mousemove', onMove)
-      renderer.dispose()
-      renderer.forceContextLoss() // 立即释放 WebGL 上下文，防止超限导致其他视图黑屏
-      el.removeChild(renderer.domElement)
-      labelEls.forEach((s) => s.remove())
+      labels.dispose(); runtime.dispose()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zh])
 
-  const facts =
-    selectedId === 'sun'
-      ? SUN_FACTS
-      : (PLANETS.find((p) => p.id === selectedId)?.facts ?? SUN_FACTS)
-  const withNote = { ...facts, noteZh: SOLAR_NOTE[0], noteEn: SOLAR_NOTE[1] }
-
   return (
     <>
-      <div ref={containerRef} className="absolute inset-0 z-0" />
-      <div ref={labelsRef} className="pointer-events-none absolute inset-0 z-10 overflow-hidden" />
-      <FactCard facts={withNote} />
+      <div ref={containerRef} className="space-stage" />
+      <div ref={labelsRef} className="space-stage pointer-events-none overflow-hidden" />
+      <SpaceExplorer kind="solar" explorer={explorer} items={SOLAR_ITEMS} layers={SOLAR_LAYERS} note={[SOLAR_NOTE[0] + ' 公转速度为演示速度，非实时星历。', SOLAR_NOTE[1] + ' Orbital motion is illustrative, not a live ephemeris.']} />
     </>
   )
 }

@@ -66,7 +66,7 @@ export default function App() {
   }, [selected, i18n.language])
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-slate-950 text-slate-100">
+    <div className={`relative h-full w-full overflow-hidden text-slate-100 ${['solar', 'galaxy', 'universe'].includes(view) ? 'bg-black' : 'bg-slate-950'}`}>
       {/* 地球视图常驻（隐藏时暂停渲染），其他尺度视图按需挂载 */}
       <GlobeView />
       {view === 'moon' && <MoonView />}
@@ -99,12 +99,12 @@ export default function App() {
       )}
       {view !== 'earth' && view !== 'earthStructure' && view !== 'mars' && view !== 'spacecraft' && (
         <p className="pointer-events-none fixed inset-x-0 bottom-4 z-10 text-center text-xs text-slate-500">
-          {t(view === 'universe' ? 'scaleHintUniverse' : 'scaleHintSpace')}
+          {['solar', 'galaxy', 'universe'].includes(view) ? (i18n.language.startsWith('zh') ? '拖动旋转 · 滚轮缩放 · 点击标签探索' : 'Drag to orbit · Scroll to zoom · Select a label to explore') : t('scaleHintSpace')}
         </p>
       )}
 
       {/* 作者与开源链接 */}
-      <footer className="fixed bottom-4 left-4 z-10 flex items-center gap-3 text-xs text-slate-500">
+      <footer className={`fixed bottom-4 left-4 z-10 items-center gap-3 text-xs text-slate-500 ${['solar', 'galaxy', 'universe'].includes(view) ? 'hidden md:flex' : 'flex'}`}>
         <a
           href="https://tanzhuo.xyz"
           target="_blank"
