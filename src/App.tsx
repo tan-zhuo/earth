@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import GlobeView from './components/GlobeView'
 import Header from './components/Header'
+import EarthAppearance from './components/EarthAppearance'
 import Sidebar from './components/Sidebar'
 import InfoPanel from './components/InfoPanel'
 import TimeTravelBar from './components/TimeTravelBar'
@@ -85,6 +86,7 @@ export default function App() {
           <TimeTravelBar />
           <RankingPanel />
           <TerrainPanel />
+          <EarthAppearance />
         </>
       )}
 
@@ -94,7 +96,8 @@ export default function App() {
       {/* 底部操作提示（地球视图未选中国家时显示） */}
       {view === 'earth' && !selected && !timeTravel && (
         <p className="pointer-events-none fixed inset-x-0 bottom-4 z-10 text-center text-xs text-slate-500">
-          {t('hint')} · {t('scaleHintEarth')}
+          <span className="sm:hidden">{i18n.language.startsWith('zh') ? '拖动旋转 · 双指缩放 · 点击国家' : 'Drag to rotate · Pinch to zoom · Select a country'}</span>
+          <span className="hidden sm:inline">{t('hint')} · {t('scaleHintEarth')}</span>
         </p>
       )}
       {view !== 'earth' && view !== 'earthStructure' && view !== 'mars' && view !== 'spacecraft' && (
@@ -104,7 +107,7 @@ export default function App() {
       )}
 
       {/* 作者与开源链接 */}
-      <footer className={`fixed bottom-4 left-4 z-10 items-center gap-3 text-xs text-slate-500 ${['solar', 'galaxy', 'universe'].includes(view) ? 'hidden md:flex' : 'flex'}`}>
+      <footer className="fixed bottom-4 left-4 z-10 hidden items-center gap-3 text-xs text-slate-500 md:flex">
         <a
           href="https://tanzhuo.xyz"
           target="_blank"

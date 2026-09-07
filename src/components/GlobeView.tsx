@@ -4,7 +4,7 @@ import type { GlobeInstance } from 'globe.gl'
 import {
   TextureLoader, SRGBColorSpace, MeshPhongMaterial, Group, Mesh as ThreeMesh, SphereGeometry,
   MeshBasicMaterial, BufferGeometry, Float32BufferAttribute, LineLoop, LineBasicMaterial, Vector3,
-  Raycaster, Sphere, Vector2,
+  Raycaster, Sphere, Vector2, AmbientLight, DirectionalLight, Color,
 } from 'three'
 import type { Mesh, Texture, PerspectiveCamera } from 'three'
 import { EARTH_SATELLITES } from '../data/spacecraft'
@@ -53,9 +53,9 @@ const terrainCeiling = (exaggeration: number) => (MAX_TERRAIN_M * exaggeration) 
 
 /** 地球球面（three-globe 半径 100），用于解析拾取 */
 const GLOBE_SPHERE = new Sphere(new Vector3(0, 0, 0), 100)
-/** 地形开启后的球面细分：360/0.4 = 900×450 段，约 40 万顶点。
+/** 地形球面细分：桌面 1200×600 段，移动端 600×300 段。
  *  再粗一档，高倍夸张下海沟/陡坡会出现明显的方格棱面 */
-const TERRAIN_CURVATURE = 0.4
+const TERRAIN_CURVATURE = window.innerWidth < 768 ? 0.6 : 0.3
 /** 相机最近距离（世界单位，地球半径 100）：开地形后允许贴近地表，
  *  透视下山脉才有"立起来"的体量感 */
 const MIN_DISTANCE_TERRAIN = 108
@@ -107,6 +107,7 @@ export default function GlobeView() {
   const showRoutes = useAppStore((s) => s.showRoutes)
   const view = useAppStore((s) => s.view)
   const showSatellites = useAppStore((s) => s.showSatellites)
+  const earthAppearance = useAppStore(s => s.earthAppearance)
   const showTerrain = useAppStore((s) => s.showTerrain)
   const exaggeration = useAppStore((s) => s.exaggeration)
   const showElevationTint = useAppStore((s) => s.showElevationTint)
@@ -133,7 +134,7 @@ export default function GlobeView() {
   const [elevReady, setElevReady] = useState(false)
 
   /* ---- 时间旅行贴图交叉淡化所需的引用 ---- */
-  /** ma → 已解码并上传 GPU 的贴图（key 0 = 现代夜景） */
+  /** ma → 已解码并上传 GPU 的贴图（key 0 = 现代白天） */
   const paleoTexRef = useRef<Map<number, Texture>>(new Map())
   /** 叠加层网格（与地球共享几何体，用于 crossfade） */
   const paleoMeshRef = useRef<{ base: Mesh; overlay: Mesh } | null>(null)
@@ -254,12 +255,13 @@ export default function GlobeView() {
     const world = new Globe(el, { animateIn: true })
       .width(el.clientWidth)
       .height(el.clientHeight)
-      .globeImageUrl('/textures/earth-night.jpg')
+      .globeImageUrl(useAppStore.getState().earthAppearance === 'day' ? '/textures/earth-blue-marble.jpg' : '/textures/earth-night.jpg')
       .backgroundImageUrl('/textures/night-sky.png')
       .atmosphereColor('#38bdf8')
-      .atmosphereAltitude(0.12)
+      .atmosphereAltitude(0.075)
       .polygonsTransitionDuration(200)
 
+    world.renderer().setPixelRatio(Math.min(window.devicePixelRatio, window.innerWidth < 768 ? 1.5 : 2))
     globeRef.current = world
     if (import.meta.env.DEV) (window as unknown as { __world?: GlobeInstance }).__world = world
     world.controls().autoRotate = true
@@ -329,7 +331,7 @@ export default function GlobeView() {
     })
 
     // 加载国家边界（world-atlas TopoJSON → GeoJSON），剔除南极洲
-    fetch('/data/countries-110m.json')
+    fetch('/data/countries-50m.json')
       .then((r) => r.json())
       .then((topo: Topology<{ countries: GeometryCollection<{ name?: string }> }>) => {
         const fc = feature(topo, topo.objects.countries)
@@ -401,6 +403,44 @@ export default function GlobeView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Each request is cancellable: leaving time travel always restores the chosen appearance.
+  useEffect(() => {
+    const world = globeRef.current
+    if (!world) return
+    let cancelled = false
+    let texture: Texture | null = null
+    const ambient = new AmbientLight('#dbe8ff', earthAppearance === 'day' || timeTravel ? 1.65 : 2.7)
+    world.lights([ambient])
+    const key = new DirectionalLight('#fff5e6', earthAppearance === 'day' || timeTravel ? 2.6 : 0.25)
+    key.position.set(-160, 180, 220)
+    world.camera().add(key)
+    world.scene().add(world.camera())
+    const material = world.globeMaterial() as MeshPhongMaterial
+    material.shininess = earthAppearance === 'day' ? 14 : 0
+    material.specular = new Color(earthAppearance === 'day' ? '#233244' : '#000000')
+    const apply = async () => {
+      if (timeTravel) return
+      const loaded = await new TextureLoader().loadAsync(earthAppearance === 'day' ? '/textures/earth-blue-marble.jpg' : '/textures/earth-night.jpg')
+      if (cancelled) { loaded.dispose(); return }
+      texture = loaded
+      loaded.colorSpace = SRGBColorSpace
+      loaded.anisotropy = Math.min(8, world.renderer().capabilities.getMaxAnisotropy())
+      material.map = loaded
+      material.needsUpdate = true
+    }
+    // The library's initial async map upload must finish before replacing its map.
+    const timer = window.setInterval(() => {
+      if (!material.map) return
+      window.clearInterval(timer)
+      void apply().catch(err => console.error('Earth appearance could not load', err))
+    }, 50)
+    return () => {
+      cancelled = true; window.clearInterval(timer)
+      world.camera().remove(key)
+      texture?.dispose()
+    }
+  }, [earthAppearance, timeTravel])
+
   // 自转开关只改变旋转状态，保留用户当前的缩放和观察位置。
   useEffect(() => {
     const world = globeRef.current
@@ -468,7 +508,7 @@ export default function GlobeView() {
   }, [i18n.language, byCcn3])
 
   // 地形起伏：真实高程（含海底）驱动顶点位移 + 山体阴影 + 可选高程着色。
-  // 两张贴图共约 1.8MB，只在首次开启时按需加载。
+  // 两张 4K 贴图共约 6.3MB，只在首次开启时按需加载。
   useEffect(() => {
     const world = globeRef.current
     if (!world) return
@@ -655,7 +695,7 @@ export default function GlobeView() {
   const loadEraTexture = async (world: GlobeInstance, ma: number): Promise<Texture> => {
     const cached = paleoTexRef.current.get(ma)
     if (cached) return cached
-    const url = ma === 0 ? '/textures/earth-night.jpg' : `/paleo/${ma}.jpg`
+    const url = ma === 0 ? '/textures/earth-blue-marble.jpg' : `/paleo/${ma}.jpg`
     const tex = await new TextureLoader().loadAsync(url)
     tex.colorSpace = SRGBColorSpace
     world.renderer().initTexture(tex) // 提前上传 GPU，消除首次使用时的掉帧
@@ -684,8 +724,7 @@ export default function GlobeView() {
         base = m
     })
     if (!base) return null
-    const baseMat = base.material as MeshPhongMaterial
-    if (baseMat.map) paleoTexRef.current.set(0, baseMat.map) // 现代夜景贴图入缓存
+    // Modern day/night maps are owned by the appearance effect.
     const overlay = base.clone()
     // 不 clone 原材质（globe.gl 的材质含 null 颜色槽，clone 会崩溃），新建独立 Phong
     // depthWrite: false —— 叠加层始终停在海平面，写深度会挡住下沉的海底地形
@@ -764,13 +803,7 @@ export default function GlobeView() {
       eraTargetRef.current = null
       cancelAnimationFrame(fadeAnimRef.current)
       const meshes = paleoMeshRef.current
-      const nightTex = paleoTexRef.current.get(0)
-      if (meshes && nightTex) {
-        ;(meshes.overlay.material as MeshPhongMaterial).opacity = 0
-        const baseMat = meshes.base.material as MeshPhongMaterial
-        baseMat.map = nightTex
-        baseMat.needsUpdate = true
-      }
+      if (meshes) (meshes.overlay.material as MeshPhongMaterial).opacity = 0
       world.polygonsData(featsRef.current as object[])
       window.setTimeout(() => applyStyles(world), 350)
     }

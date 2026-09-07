@@ -4,6 +4,7 @@ import { useAppStore } from '../store/useAppStore'
 import type { SpaceView } from '../store/useAppStore'
 import type { Country } from '../types'
 import { SPACECRAFT_MODELS } from '../data/spacecraftModels'
+import Icon, { type IconName } from './Icon'
 import { EXAGGERATION_MAX } from '../data/terrain'
 
 const VIEWS: SpaceView[] = ['earth', 'moon', 'solar', 'galaxy', 'universe']
@@ -236,7 +237,7 @@ export default function Sidebar() {
                     : 'border-slate-700/50 text-slate-300 hover:border-sky-500/40 hover:text-sky-200'
                 }`}
               >
-                {t(`views.${v}`)}
+                <span className="flex items-center gap-2"><Icon name={(v === 'earthStructure' ? 'layers' : v) as IconName} />{t(`views.${v}`)}</span>
               </button>
             ))}
           </div>
@@ -257,7 +258,7 @@ export default function Sidebar() {
                     : 'border-slate-700/50 text-slate-300 hover:border-sky-500/40 hover:text-sky-200'
                 }`}
               >
-                {t(`views.${v}`)}
+                <span className="flex items-center gap-2"><Icon name={(v === 'earthStructure' ? 'layers' : v) as IconName} />{t(`views.${v}`)}</span>
               </button>
             ))}
           </div>
@@ -278,7 +279,7 @@ export default function Sidebar() {
                     : 'border-slate-700/50 text-slate-300 hover:border-sky-500/40 hover:text-sky-200'
                 }`}
               >
-                <span className="block text-sm leading-tight">{zh ? c.nameZh : c.nameEn}</span>
+                <Icon name="satellite" size={20} style={{ marginBottom: 10 }} /><span className="block text-sm leading-tight">{zh ? c.nameZh : c.nameEn}</span>
                 <span className="mt-0.5 block text-[10px] text-slate-500">
                   {zh ? c.kindZh : c.kindEn}
                 </span>

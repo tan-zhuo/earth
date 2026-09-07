@@ -260,8 +260,8 @@ for (let i = 0; i < relief.length; i++) {
 const outDir = join(ROOT, 'public/textures')
 await mkdir(outDir, { recursive: true })
 const files = [
-  ['earth-elevation.png', png8(elev, OUT_W, OUT_H)],
-  ['earth-relief.png', png8(relief, OUT_W, OUT_H)],
+  [`earth-elevation${OUT_W === 4096 ? '-4k' : ''}.png`, png8(elev, OUT_W, OUT_H)],
+  [`earth-relief${OUT_W === 4096 ? '-4k' : ''}.png`, png8(relief, OUT_W, OUT_H)],
 ]
 for (const [name, data] of files) {
   await writeFile(join(outDir, name), data)

@@ -20,6 +20,8 @@ export type SpaceView =
 
 interface AppState {
   /** 当前尺度视图 */
+  earthAppearance: 'day' | 'night'
+  setEarthAppearance: (mode: 'day' | 'night') => void
   view: SpaceView
   countries: Country[]
   /** ccn3（ISO numeric）→ Country，供 GeoJSON feature.id 快速查找 */
@@ -75,6 +77,11 @@ interface AppState {
 const countries = getAllCountries()
 
 export const useAppStore = create<AppState>((set) => ({
+  earthAppearance: (() => { try { return localStorage.getItem('earth:appearance') === 'night' ? 'night' : 'day' } catch { return 'day' } })(),
+  setEarthAppearance: (mode) => {
+    try { localStorage.setItem('earth:appearance', mode) } catch { /* Private browsing can disable storage. */ }
+    set({ earthAppearance: mode })
+  },
   view: 'earth',
   countries,
   byCcn3: new Map(countries.filter((c) => c.ccn3).map((c) => [c.ccn3, c])),

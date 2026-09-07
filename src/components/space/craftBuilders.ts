@@ -5,7 +5,7 @@
  */
 import {
   BoxGeometry, CanvasTexture, CircleGeometry, ConeGeometry, CylinderGeometry, DoubleSide,
-  Group, LatheGeometry, Mesh, MeshPhongMaterial, Object3D, RepeatWrapping, Shape, ShapeGeometry,
+  Group, LatheGeometry, Mesh, MeshStandardMaterial, Object3D, RepeatWrapping, Shape, ShapeGeometry,
   SphereGeometry, TorusGeometry, Vector2, Vector3, SRGBColorSpace,
 } from 'three'
 
@@ -16,22 +16,25 @@ let panelTex: CanvasTexture | null = null
 function solarTexture(): CanvasTexture {
   if (panelTex) return panelTex
   const c = document.createElement('canvas')
-  c.width = c.height = 64
+  c.width = c.height = 256
   const ctx = c.getContext('2d')!
   ctx.fillStyle = '#152a63'
-  ctx.fillRect(0, 0, 64, 64)
+  ctx.fillRect(0, 0, 256, 256)
   ctx.strokeStyle = '#3f63c4'
   ctx.lineWidth = 2
-  for (let i = 0; i <= 64; i += 16) {
+  for (let i = 0; i <= 256; i += 16) {
     ctx.beginPath()
     ctx.moveTo(i, 0)
-    ctx.lineTo(i, 64)
+    ctx.lineTo(i, 256)
     ctx.stroke()
     ctx.beginPath()
     ctx.moveTo(0, i)
-    ctx.lineTo(64, i)
+    ctx.lineTo(256, i)
     ctx.stroke()
   }
+  ctx.strokeStyle = '#8195bb'
+  ctx.lineWidth = 0.6
+  for (let x = 2; x < 256; x += 4) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 256); ctx.stroke() }
   panelTex = new CanvasTexture(c)
   panelTex.colorSpace = SRGBColorSpace
   panelTex.wrapS = panelTex.wrapT = RepeatWrapping
@@ -63,12 +66,12 @@ function foilTexture(): CanvasTexture {
   return foilTex
 }
 
-const hull = () => new MeshPhongMaterial({ color: 0xd6dbe4, shininess: 70 })
-const white = () => new MeshPhongMaterial({ color: 0xeef2f7, shininess: 25 })
-const dark = () => new MeshPhongMaterial({ color: 0x2a3040, shininess: 20 })
-const gold = () => new MeshPhongMaterial({ color: 0xd8a72c, shininess: 120 })
-const foil = () => new MeshPhongMaterial({ map: foilTexture(), shininess: 90 })
-const solar = () => new MeshPhongMaterial({ map: solarTexture(), shininess: 150, specular: 0x2b4a7a })
+const hull = () => new MeshStandardMaterial({ color: 0xd6dbe4, roughness: 0.3, metalness: 0.8 })
+const white = () => new MeshStandardMaterial({ color: 0xeef2f7, roughness: 0.4 })
+const dark = () => new MeshStandardMaterial({ color: 0x2a3040, roughness: 0.4 })
+const gold = () => new MeshStandardMaterial({ color: 0xe8bc62, roughness: 0.2, metalness: 1 })
+const foil = () => new MeshStandardMaterial({ map: foilTexture(), bumpMap: foilTexture(), bumpScale: 0.025, roughness: 0.36, metalness: 0.85 })
+const solar = () => new MeshStandardMaterial({ map: solarTexture(), roughness: 0.45, metalness: 0.25 })
 
 /* ---------------- 搭建辅助 ---------------- */
 
@@ -131,13 +134,13 @@ function buildHubble(): Group {
     put(tube, new Mesh(new TorusGeometry(1.27, 0.045, 8, 48), white()), 0, 0, z)
   }
   const aperture = part(root, 'aperture', [0, 1.28, 3.8])
-  put(aperture, new Mesh(new CylinderGeometry(1.28, 1.28, 1.5, 40, 1, true), new MeshPhongMaterial({ color: '#aeb8c7', side: DoubleSide })), 0, 0, 2.95).rotation.x = Math.PI / 2
+  put(aperture, new Mesh(new CylinderGeometry(1.28, 1.28, 1.5, 40, 1, true), new MeshStandardMaterial({ color: '#aeb8c7', side: DoubleSide })), 0, 0, 2.95).rotation.x = Math.PI / 2
   put(aperture, new Mesh(new CircleGeometry(1.24, 40), dark()), 0, 0, 2.23)
   put(aperture, new Mesh(new CircleGeometry(0.94, 40), hull()), 0, 0, 2.24)
   const hinge = new Group()
   hinge.position.set(0, 1.28, 3.7)
   hinge.rotation.x = -0.8
-  put(hinge, new Mesh(new CircleGeometry(1.26, 40), new MeshPhongMaterial({ color: '#d6dbe4', side: DoubleSide })), 0, 1.26, 0)
+  put(hinge, new Mesh(new CircleGeometry(1.26, 40), new MeshStandardMaterial({ color: '#d6dbe4', side: DoubleSide })), 0, 1.26, 0)
   aperture.add(hinge)
   const panels = part(root, 'panel', [3.4, 0, 0])
   for (const side of [-1, 1]) {
@@ -209,6 +212,11 @@ function buildTiangong(): Group {
     put(lab, new Mesh(new CylinderGeometry(0.62, 0.62, 3.2, 28), white()), side * 2.5, 0, 0.8).rotation.z = Math.PI / 2
     put(lab, new Mesh(new CylinderGeometry(0.45, 0.45, 0.7, 24), hull()), side * 4.4, 0, 0.8).rotation.z = Math.PI / 2
   }
+  for (const z of [-2.9, -2.0, -1.1, -0.6]) put(core, new Mesh(new TorusGeometry(0.785, 0.018, 8, 64), hull()), 0, 0, z)
+  for (const side of [-1, 1]) {
+    const lab = root.getObjectByName(side < 0 ? 'wentian' : 'mengtian')!
+    for (const x of [1.1, 2.1, 3.1, 3.9]) put(lab, new Mesh(new TorusGeometry(0.625, 0.016, 8, 64), hull()), side * x, 0, 0.8).rotation.y = Math.PI / 2
+  }
   const wings = part(root, 'wings', [4.4, 0, 4.0])
   for (const x of [-4.4, 4.4]) for (const side of [-1, 1]) {
     link(wings, [x, 0, 0.8], [x, 0, 0.8 + side * 1.0], 0.065)
@@ -263,7 +271,7 @@ function buildJWST(): Group {
     outline.lineTo(0, -5.2 * scale)
     outline.lineTo(-3.25 * scale, 0.3)
     outline.closePath()
-    const sheet = put(shield, new Mesh(new ShapeGeometry(outline), new MeshPhongMaterial({ color: i % 2 ? '#a4aab5' : '#cbd0db', side: DoubleSide, shininess: 55 })), 0, -1 + i * 0.105, 0)
+    const sheet = put(shield, new Mesh(new ShapeGeometry(outline), new MeshStandardMaterial({ color: i % 2 ? '#a4aab5' : '#cbd0db', side: DoubleSide, roughness: 0.4 })), 0, -1 + i * 0.105, 0)
     sheet.rotation.x = -Math.PI / 2
     sheet.userData.shieldLayer = true
   }
@@ -284,7 +292,7 @@ function buildVoyager(): Group {
   const root = new Group()
   const dish = part(root, 'dish', [0, 1.04, 2])
   const profile = Array.from({ length: 25 }, (_, i) => { const r = i / 24 * 2; return new Vector2(r, r * r * 0.26) })
-  put(dish, new Mesh(new LatheGeometry(profile, 64), new MeshPhongMaterial({ color: '#edf0f2', side: DoubleSide, shininess: 35 })))
+  put(dish, new Mesh(new LatheGeometry(profile, 64), new MeshStandardMaterial({ color: '#edf0f2', side: DoubleSide, roughness: 0.4 })))
   put(dish, new Mesh(new TorusGeometry(2, 0.035, 8, 64), hull()), 0, 1.04, 0).rotation.x = Math.PI / 2
   link(dish, [0, -0.65, 0], [0, 0.12, 0], 0.25)
   put(dish, new Mesh(new CylinderGeometry(0.85, 0.85, 0.5, 10), foil()), 0, -0.6, 0)
@@ -311,7 +319,7 @@ function buildVoyager(): Group {
   put(boom, new Mesh(new BoxGeometry(0.15, 0.15, 0.18), dark()), tip.x, tip.y, tip.z)
   for (const side of [-1, 1]) link(instruments, [side * 0.3, -0.8, 0.3], [side * 3, -1.4, 4.6], 0.018)
   const record = part(root, 'record', [0.72, -0.6, 0.5])
-  put(record, new Mesh(new CircleGeometry(0.33, 40), new MeshPhongMaterial({ color: '#ddb653', side: DoubleSide, shininess: 80 })), 0.72, -0.6, 0.5).rotation.y = 0.95
+  put(record, new Mesh(new CircleGeometry(0.33, 40), new MeshStandardMaterial({ color: '#ddb653', side: DoubleSide, roughness: 0.4 })), 0.72, -0.6, 0.5).rotation.y = 0.95
   return root
 }
 

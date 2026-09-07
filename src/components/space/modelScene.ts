@@ -1,4 +1,5 @@
-import { AmbientLight, Box3, DirectionalLight, Material, Mesh, Object3D, PerspectiveCamera, Scene, Sphere, Texture, Vector3, WebGLRenderer } from 'three'
+import { ACESFilmicToneMapping, PMREMGenerator, AmbientLight, Box3, DirectionalLight, Material, Mesh, Object3D, PerspectiveCamera, Scene, Sphere, Texture, Vector3, WebGLRenderer } from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
 /** Craft textures are shared; structural scene textures are owned by that scene. */
@@ -20,12 +21,20 @@ export function createModelScene(el: HTMLDivElement, direction = new Vector3(1, 
   const camera = new PerspectiveCamera(40, 1, 0.01, 10000)
   const renderer = new WebGLRenderer({ antialias: true, alpha: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, window.innerWidth < 768 ? 1.5 : 2))
+  renderer.toneMapping = ACESFilmicToneMapping
+  renderer.toneMappingExposure = 0.9
+  const generator = new PMREMGenerator(renderer)
+  const room = new RoomEnvironment()
+  const environment = generator.fromScene(room, 0.04)
+  scene.environment = environment.texture
+  scene.environmentIntensity = 0.65
+  room.dispose(); generator.dispose()
   el.appendChild(renderer.domElement)
   const controls = new OrbitControls(camera, renderer.domElement)
   controls.enableDamping = true
   controls.enablePan = false
   controls.autoRotateSpeed = 0.5
-  scene.add(new AmbientLight('#dce6ff', 1.05))
+  scene.add(new AmbientLight('#dce6ff', 0.35))
   const key = new DirectionalLight('#fff4dd', 2.1); key.position.set(5, 8, 10); scene.add(key)
   const fill = new DirectionalLight('#92b5e2', 1.2); fill.position.set(-6, 2, -4); scene.add(fill)
   let subject: Object3D | null = null
@@ -80,6 +89,6 @@ export function createModelScene(el: HTMLDivElement, direction = new Vector3(1, 
   }
   return { scene, camera, renderer, controls, start, fit,
     setSubject(object: Object3D, bounds?: Sphere) { subject = object; extent = bounds ?? null; fit() },
-    dispose() { cancelAnimationFrame(raf); observer.disconnect(); controls.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove() },
+    dispose() { cancelAnimationFrame(raf); observer.disconnect(); controls.dispose(); environment.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove() },
   }
 }
