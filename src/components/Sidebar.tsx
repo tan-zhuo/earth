@@ -1,3 +1,4 @@
+import CountryFlag from './CountryFlag'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/useAppStore'
@@ -148,10 +149,10 @@ export default function Sidebar() {
                       onClick={() => pickCountry(c)}
                       className="flex w-full items-center gap-2.5 bg-slate-800/40 px-3 py-2 text-left transition hover:bg-sky-500/15"
                     >
-                      <img
-                        src={`https://flagcdn.com/w40/${c.cca2.toLowerCase()}.png`}
+                      <CountryFlag
+                        country={c}
                         alt=""
-                        className="h-3.5 w-5 rounded-sm border border-slate-700/60 object-cover"
+                        className="h-5 w-8"
                       />
                       <span className="min-w-0 flex-1 truncate text-sm text-slate-200">
                         {zh ? c.nameZh : c.nameEn}

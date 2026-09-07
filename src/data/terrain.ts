@@ -2,14 +2,17 @@
  * 地形高程（含海底）数据的编码常量、色带与取值工具。
  *
  * 贴图由 scripts/build-terrain.mjs 从 NOAA ETOPO1 生成：
- *   earth-elevation-4k.png  绝对高程，byte = 高程(m)/ELEV_STEP + SEA_BYTE
+ *   earth-height-rg-4096.png  绝对高程，米 = R*256 + G - HEIGHT_OFFSET
  *   earth-relief-4k.png     局部起伏（高通），byte = 起伏(m)/RELIEF_STEP + 128
- * 改动编码请同步修改脚本里的同名常量。
+ * ELEV_STEP / SEA_BYTE 只用于兼容原有高程色带。改动编码请同步更新生成脚本。
  */
 
-export const ELEVATION_TEXTURE = '/textures/earth-elevation-4k.png'
+export const ELEVATION_TEXTURE = '/textures/earth-height-rg-4096.png'
 export const RELIEF_TEXTURE = '/textures/earth-relief-4k.png'
 
+/** Packed RG keeps metre-scale encoding, not metre-scale spatial resolution. */
+export const HEIGHT_OFFSET = 32768
+export const decodeHeight = (r: number, g: number) => r * 256 + g - HEIGHT_OFFSET
 export const ELEV_STEP = 80
 export const SEA_BYTE = 140
 export const RELIEF_STEP = 16
@@ -81,6 +84,7 @@ let samplerPromise: Promise<ElevationSampler> | null = null
 export function loadElevationSampler(): Promise<ElevationSampler> {
   samplerPromise ??= (async () => {
     const res = await fetch(ELEVATION_TEXTURE)
+    if (!res.ok) throw new Error(`Elevation texture: HTTP ${res.status}`)
     const blob = await res.blob()
     // colorSpaceConversion:'none' —— 高程是数据不是颜色，禁止浏览器做色彩管理
     const bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none' })
@@ -91,11 +95,11 @@ export function loadElevationSampler(): Promise<ElevationSampler> {
     ctx.drawImage(bmp, 0, 0, TEX_W, TEX_H)
     bmp.close()
     const rgba = ctx.getImageData(0, 0, TEX_W, TEX_H).data
-    const gray = new Uint8Array(TEX_W * TEX_H)
-    for (let i = 0; i < gray.length; i++) gray[i] = rgba[i * 4]
+    const heights = new Int16Array(TEX_W * TEX_H)
+    for (let i = 0; i < heights.length; i++) heights[i] = decodeHeight(rgba[i * 4], rgba[i * 4 + 1])
 
     const at = (x: number, y: number) =>
-      gray[Math.min(TEX_H - 1, Math.max(0, y)) * TEX_W + ((x % TEX_W) + TEX_W) % TEX_W]
+      heights[Math.min(TEX_H - 1, Math.max(0, y)) * TEX_W + ((x % TEX_W) + TEX_W) % TEX_W]
 
     return (lat: number, lng: number) => {
       // 双线性插值，经度环绕、纬度夹边
@@ -110,8 +114,8 @@ export function loadElevationSampler(): Promise<ElevationSampler> {
         at(x0 + 1, y0) * tx * (1 - ty) +
         at(x0, y0 + 1) * (1 - tx) * ty +
         at(x0 + 1, y0 + 1) * tx * ty
-      return byteToMeters(b)
+      return b
     }
-  })()
+  })().catch(error => { samplerPromise = null; throw error })
   return samplerPromise
 }

@@ -1,3 +1,4 @@
+import { flagFallback } from './CountryFlag'
 import { useEffect, useRef, useState } from 'react'
 import Globe from 'globe.gl'
 import type { GlobeInstance } from 'globe.gl'
@@ -508,7 +509,7 @@ export default function GlobeView() {
   }, [i18n.language, byCcn3])
 
   // 地形起伏：真实高程（含海底）驱动顶点位移 + 山体阴影 + 可选高程着色。
-  // 两张 4K 贴图共约 6.3MB，只在首次开启时按需加载。
+  // 两张 4K 高程与起伏贴图，只在首次开启时按需加载。
   useEffect(() => {
     const world = globeRef.current
     if (!world) return
@@ -610,6 +611,7 @@ export default function GlobeView() {
     const world = globeRef.current
     if (!world) return
     type HtmlMarker = { kind: 'flag'; country: Country } | { kind: 'port'; port: Port }
+    const flagNodes: { element: HTMLButtonElement; country: Country }[] = []
     const markers: HtmlMarker[] = []
     if (!timeTravel && showFlags)
       markers.push(...countries.map((c) => ({ kind: 'flag' as const, country: c })))
@@ -635,17 +637,22 @@ export default function GlobeView() {
         const m = d as HtmlMarker
         if (m.kind === 'flag') {
           const c = m.country
+          const button = document.createElement('button')
+          button.className = 'globe-flag'
+          button.dataset.country = c.cca3
+          const name = zh ? c.nameZh : c.nameEn
+          button.title = name
+          button.setAttribute('aria-label', name)
           const img = document.createElement('img')
-          img.src = `https://flagcdn.com/w40/${c.cca2.toLowerCase()}.png`
+          img.src = c.flagSvg
+          img.alt = ''
+          img.decoding = 'async'
           img.loading = 'lazy'
-          const w = Math.max(12, Math.min(26, Math.sqrt(c.area || 1) / 80))
-          img.style.width = `${w}px`
-          img.style.borderRadius = '2px'
-          img.style.border = '1px solid rgba(148,163,184,0.5)'
-          img.style.cursor = 'pointer'
-          img.style.pointerEvents = 'auto'
-          img.onclick = () => select(c)
-          return img
+          img.onerror = () => flagFallback(img, c)
+          button.appendChild(img)
+          button.onclick = () => select(c)
+          flagNodes.push({ element: button, country: c })
+          return button
         }
         // 港口：光点 + 中英文名（HTML 渲染，原生支持中文）
         const el = document.createElement('div')
@@ -657,6 +664,34 @@ export default function GlobeView() {
             ${zh ? m.port.nameZh : m.port.nameEn}</span>`
         return el
       })
+    world.htmlElementVisibilityModifier((element, visible) => {
+      element.dataset.front = String(visible)
+      if (!visible) element.style.visibility = 'hidden'
+      else if (!element.classList.contains('globe-flag')) element.style.visibility = 'visible'
+    })
+    let frame = 0, last = 0
+    const layout = (now: number) => {
+      if (now - last > 120 && useAppStore.getState().view === 'earth' && !document.hidden) {
+        last = now
+        const width = Math.round(Math.min(52, Math.max(28, 34 + (2.5 - world.pointOfView().altitude) * 12)))
+        const active = document.activeElement
+        const selectedCode = selectedRef.current?.cca3
+        const items = [...flagNodes].sort((a, b) =>
+          Number(b.element === active || b.country.cca3 === selectedCode) - Number(a.element === active || a.country.cca3 === selectedCode) || b.country.area - a.country.area)
+        for (const { element } of items) element.style.setProperty('--flag-width', `${width}px`)
+        const occupied: DOMRect[] = []
+        // Batch reads after size writes; the number of labels does not add render passes.
+        const measured = items.map(item => ({ ...item, bounds: item.element.getBoundingClientRect() }))
+        for (const { element, bounds } of measured) {
+          const visible = element.dataset.front === 'true' && bounds.width > 0 && bounds.left >= 4 && bounds.right <= innerWidth - 4 && bounds.top > 65 && bounds.bottom < innerHeight - 35 && !occupied.some(rect => bounds.left < rect.right + 4 && bounds.right > rect.left - 4 && bounds.top < rect.bottom + 4 && bounds.bottom > rect.top - 4)
+          element.style.visibility = visible ? 'visible' : 'hidden'
+          if (visible) occupied.push(bounds)
+        }
+      }
+      frame = requestAnimationFrame(layout)
+    }
+    if (showFlags) frame = requestAnimationFrame(layout)
+    return () => { cancelAnimationFrame(frame) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showFlags, showRoutes, countries, timeTravel, i18n.language, exaggeration, showTerrain, elevReady])
 

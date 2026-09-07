@@ -1,3 +1,4 @@
+import CountryFlag from './CountryFlag'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -226,10 +227,10 @@ export default function InfoPanel() {
             <path d="M3 3l10 10M13 3L3 13" />
           </svg>
         </button>
-        <img
-          src={selected.flagSvg}
+        <CountryFlag
+          country={selected}
           alt={name}
-          className="float-left mr-3 h-10 max-w-20 rounded-md md:float-none md:mb-3 md:mr-0 md:h-16 md:max-w-none border border-slate-600/50 shadow-lg"
+          className="float-left mr-3 h-12 w-20 md:float-none md:mb-3 md:mr-0 md:h-20 md:w-32 drop-shadow-lg"
         />
         <h2 className="text-xl font-bold text-slate-100 md:text-2xl">{name}</h2>
         <p className="text-sm text-slate-400">{altName}</p>

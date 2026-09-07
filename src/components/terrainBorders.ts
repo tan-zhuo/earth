@@ -13,7 +13,7 @@ import type { ElevationSampler } from '../data/terrain'
 /** 边界线离地高度（地球半径倍数），避免与地表 z-fighting */
 const LINE_LIFT = 0.0015
 /** 长于该角距（度）的边界段要细分，否则跨山脉的直线段会插进山里 */
-const MAX_STEP_DEG = 1
+const MAX_STEP_DEG = 0.2
 
 export interface BorderOptions {
   sampler: ElevationSampler

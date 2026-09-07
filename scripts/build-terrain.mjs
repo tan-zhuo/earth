@@ -1,12 +1,12 @@
 /**
  * 构建时数据脚本：从 NOAA ETOPO1（1 弧分全球地形 + 海底地形，公有领域）
- * 生成两张地形贴图，供 3D 地球做真实高程起伏：
+ * 生成 4K 地形数据，供 3D 地球做高程起伏：
  *
- *   public/textures/earth-elevation.png  8bit 灰度，绝对高程（含海底），
- *                                        byte = 高程(m)/80 + 140（海平面恰为 140）
- *                                        → 顶点位移、高程着色、鼠标读数都用它
- *   public/textures/earth-relief.png     8bit 灰度，局部起伏（高通滤波，步长 16m）
- *                                        → 片元着色器里算山体阴影（比绝对高程精度高一个量级，不会出现等高线台阶）
+ *   earth-height-rg-4096.png  RGB 编码：米 = R*256 + G - 32768。
+ *                            顶点位移、坡面法线、高程着色与鼠标读数共用。
+ *   earth-relief-4k.png       局部起伏：byte = 起伏(m)/16 + 128，用于山体阴影。
+ *   earth-elevation-4k.png    兼容旧版的灰度高程：byte = 高程(m)/80 + 140。
+ *   编码精度为整数米，空间细节仍取决于降采样后的全球网格。
  *
  * 数据源：NOAA NCEI ETOPO1 Ice Surface，经 ERDDAP 按纬度分段下载（int16，单位米）。
  * 用法：node scripts/build-terrain.mjs [--width 4096] [--cache <目录>]
@@ -105,22 +105,23 @@ function parseNetcdf3(buf) {
 /* PNG 编码（8bit 灰度，Paeth 行过滤）                                   */
 /* ------------------------------------------------------------------ */
 
-function png8(gray, w, h) {
+function png8(gray, w, h, channels = 1) {
+  const stride = w * channels
   // 每行首字节为过滤器类型 4（Paeth），对平滑地形数据压缩率最好
-  const raw = Buffer.alloc((w + 1) * h)
+  const raw = Buffer.alloc((stride + 1) * h)
   for (let y = 0; y < h; y++) {
-    const off = y * (w + 1)
+    const off = y * (stride + 1)
     raw[off] = 4
-    for (let x = 0; x < w; x++) {
-      const a = x > 0 ? gray[y * w + x - 1] : 0
-      const b = y > 0 ? gray[(y - 1) * w + x] : 0
-      const c = x > 0 && y > 0 ? gray[(y - 1) * w + x - 1] : 0
+    for (let x = 0; x < stride; x++) {
+      const a = x >= channels ? gray[y * stride + x - channels] : 0
+      const b = y > 0 ? gray[(y - 1) * stride + x] : 0
+      const c = x >= channels && y > 0 ? gray[(y - 1) * stride + x - channels] : 0
       const pp = a + b - c
       const pa = Math.abs(pp - a)
       const pb = Math.abs(pp - b)
       const pc = Math.abs(pp - c)
       const pred = pa <= pb && pa <= pc ? a : pb <= pc ? b : c
-      raw[off + 1 + x] = (gray[y * w + x] - pred) & 0xff
+      raw[off + 1 + x] = (gray[y * stride + x] - pred) & 0xff
     }
   }
   const chunk = (type, data) => {
@@ -135,7 +136,7 @@ function png8(gray, w, h) {
   ihdr.writeUInt32BE(w, 0)
   ihdr.writeUInt32BE(h, 4)
   ihdr[8] = 8 // bit depth
-  ihdr[9] = 0 // 灰度
+  ihdr[9] = channels === 3 ? 2 : 0 // RGB or grayscale
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk('IHDR', ihdr),
@@ -245,6 +246,12 @@ for (const v of grid) {
 }
 console.log(`高程范围：${min.toFixed(0)}m ~ ${max.toFixed(0)}m（${OUT_W}×${OUT_H} 网格平均）`)
 
+const packed = new Uint8Array(OUT_W * OUT_H * 3)
+for (let i = 0; i < grid.length; i++) {
+  const value = Math.max(0, Math.min(65535, Math.round(grid[i]) + 32768))
+  packed[i * 3] = value >>> 8
+  packed[i * 3 + 1] = value & 255
+}
 const elev = new Uint8Array(OUT_W * OUT_H)
 for (let i = 0; i < elev.length; i++) {
   elev[i] = Math.min(255, Math.max(0, Math.round(grid[i] / ELEV_STEP) + SEA_BYTE))
@@ -260,6 +267,7 @@ for (let i = 0; i < relief.length; i++) {
 const outDir = join(ROOT, 'public/textures')
 await mkdir(outDir, { recursive: true })
 const files = [
+  [`earth-height-rg-${OUT_W}.png`, png8(packed, OUT_W, OUT_H, 3)],
   [`earth-elevation${OUT_W === 4096 ? '-4k' : ''}.png`, png8(elev, OUT_W, OUT_H)],
   [`earth-relief${OUT_W === 4096 ? '-4k' : ''}.png`, png8(relief, OUT_W, OUT_H)],
 ]

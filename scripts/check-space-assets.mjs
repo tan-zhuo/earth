@@ -29,3 +29,9 @@ for (const kind of ['elevation', 'relief']) {
   assert.equal(data.readUInt32BE(20), 2048)
 }
 console.log('4K terrain texture dimensions verified')
+
+const packedHeight = await readFile(new URL('../public/textures/earth-height-rg-4096.png', import.meta.url))
+assert.equal(packedHeight.readUInt32BE(16), 4096)
+assert.equal(packedHeight.readUInt32BE(20), 2048)
+assert.equal(packedHeight[25], 2, 'Height texture must preserve both R and G channels')
+console.log('Packed RG height format verified')
