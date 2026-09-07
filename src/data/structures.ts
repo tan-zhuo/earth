@@ -49,8 +49,8 @@ export const EARTH_STRUCTURE_FACTS: SpaceFacts = {
   ],
   descZh: '人类从未钻透地壳（最深钻孔仅 12.3 km），对内部的认识几乎全部来自地震波：纵波与横波在不同物质中的传播差异，勾勒出这幅分层图景。地幔的缓慢对流驱动着板块运动、地震与火山。',
   descEn: 'No drill has ever pierced the crust (deepest borehole: 12.3 km). Nearly everything we know comes from seismic waves — how P- and S-waves travel through different materials maps these layers. Slow mantle convection drives plate tectonics, earthquakes and volcanoes.',
-  noteZh: '剖面比例真实，颜色为示意。拖动旋转查看。',
-  noteEn: 'Layer proportions are to scale; colors are illustrative. Drag to rotate.',
+  noteZh: '剖面为示意模型，薄层厚度适度夸大，颜色用于区分层次。拖动旋转查看。',
+  noteEn: 'Schematic cutaway: thin layers are exaggerated and colors distinguish the layers. Drag to rotate.',
 }
 
 export const EARTH_MAGNETIC_FACTS: SpaceFacts = {
@@ -96,8 +96,8 @@ export const MARS_STRUCTURE_FACTS: SpaceFacts = {
   ],
   descZh: '2018–2022 年，InSight 号的地震仪首次"透视"了另一颗行星的内部：火星地核比预想的大而轻，仍是液态；但地幔对流太弱，无法再驱动发电机与板块运动。',
   descEn: "From 2018–2022, InSight's seismometer gave us the first look inside another planet: Mars's core is larger and lighter than expected, and still liquid — but mantle convection is too feeble to power a dynamo or plate tectonics.",
-  noteZh: '剖面比例基于 InSight 测量，颜色为示意。',
-  noteEn: 'Proportions based on InSight measurements; colors illustrative.',
+  noteZh: '层次参考 InSight 测量；薄层厚度和颜色为展示而调整。',
+  noteEn: 'Layers informed by InSight measurements; thin layers and colors adjusted for illustration.',
 }
 
 export const MARS_MAGNETIC_FACTS: SpaceFacts = {

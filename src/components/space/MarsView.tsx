@@ -29,7 +29,7 @@ function MarsSurface() {
       .atmosphereColor('#f97316')
       .atmosphereAltitude(0.08)
     globeRef.current = world
-    world.controls().autoRotate = true
+    world.controls().autoRotate = false
     world.controls().autoRotateSpeed = 0.5
     world.pointOfView({ lat: 10, lng: 60, altitude: 2.2 }, 0)
 
@@ -73,7 +73,7 @@ function MarsSurface() {
       })
   }, [i18n.language])
 
-  return <div ref={containerRef} className="absolute inset-0 z-0" />
+  return <div ref={containerRef} className="model-stage" />
 }
 
 /** 火星视图：表面（着陆点）/ 内部结构 / 磁场 三种模式 */
@@ -91,15 +91,16 @@ export default function MarsView() {
       ) : (
         <StructureScene config={MARS_STRUCTURE} showField={mode === 'magnetic'} />
       )}
-      <FactCard facts={facts} />
+      <FactCard modelLayout facts={facts} />
 
       {/* 模式切换 */}
-      <div className="fixed inset-x-0 bottom-6 z-20 flex justify-center">
+      <div className="model-picker flex justify-start">
         <div className="flex overflow-hidden rounded-full border border-slate-700/60 bg-slate-900/80 backdrop-blur">
           {(['surface', 'structure', 'magnetic'] as Mode[]).map((m) => (
             <button
               key={m}
               onClick={() => setMode(m)}
+              aria-pressed={mode === m}
               className={`px-4 py-2 text-xs font-medium transition ${
                 mode === m ? 'bg-sky-500/15 text-sky-300' : 'text-slate-400 hover:text-slate-200'
               }`}

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { SpaceFacts } from '../../data/space'
 
 /** 宇宙视图共用的右侧资料卡（月球/行星/银河系/宇宙），可关闭，关闭后显示 ⓘ 重开按钮 */
-export default function FactCard({ facts }: { facts: SpaceFacts }) {
+export default function FactCard({ facts, modelLayout = false }: { facts: SpaceFacts; modelLayout?: boolean }) {
   const { i18n } = useTranslation()
   const zh = i18n.language.startsWith('zh')
   const [open, setOpen] = useState(true)
@@ -30,7 +30,7 @@ export default function FactCard({ facts }: { facts: SpaceFacts }) {
   }
 
   return (
-    <aside className="panel-enter fixed inset-x-0 bottom-0 z-20 max-h-[60vh] overflow-y-auto rounded-t-2xl border-t border-slate-700/50 bg-slate-900/85 backdrop-blur-xl md:inset-x-auto md:top-16 md:right-4 md:bottom-auto md:max-h-[calc(100vh-8rem)] md:w-[380px] md:rounded-2xl md:border">
+    <aside className={modelLayout ? "model-info overflow-y-auto!" : "panel-enter fixed inset-x-0 bottom-0 z-20 max-h-[60vh] overflow-y-auto rounded-t-2xl border-t border-slate-700/50 bg-slate-900/85 backdrop-blur-xl md:inset-x-auto md:top-16 md:right-4 md:bottom-auto md:max-h-[calc(100vh-8rem)] md:w-[380px] md:rounded-2xl md:border"}>
       <div className="relative p-5">
         <button
           onClick={() => setOpen(false)}

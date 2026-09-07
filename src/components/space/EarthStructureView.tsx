@@ -14,15 +14,16 @@ export default function EarthStructureView() {
   return (
     <>
       <StructureScene config={EARTH_STRUCTURE} showField={mode === 'magnetic'} />
-      <FactCard facts={mode === 'structure' ? EARTH_STRUCTURE_FACTS : EARTH_MAGNETIC_FACTS} />
+      <FactCard modelLayout facts={mode === 'structure' ? EARTH_STRUCTURE_FACTS : EARTH_MAGNETIC_FACTS} />
 
       {/* 模式切换 */}
-      <div className="fixed inset-x-0 bottom-6 z-20 flex justify-center">
+      <div className="model-picker flex justify-start">
         <div className="flex overflow-hidden rounded-full border border-slate-700/60 bg-slate-900/80 backdrop-blur">
           {(['structure', 'magnetic'] as Mode[]).map((m) => (
             <button
               key={m}
               onClick={() => setMode(m)}
+              aria-pressed={mode === m}
               className={`px-4 py-2 text-xs font-medium transition ${
                 mode === m ? 'bg-sky-500/15 text-sky-300' : 'text-slate-400 hover:text-slate-200'
               }`}

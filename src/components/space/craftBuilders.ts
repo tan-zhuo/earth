@@ -6,7 +6,7 @@
 import {
   BoxGeometry, CanvasTexture, CircleGeometry, ConeGeometry, CylinderGeometry, DoubleSide,
   Group, LatheGeometry, Mesh, MeshPhongMaterial, Object3D, RepeatWrapping, Shape, ShapeGeometry,
-  SphereGeometry, TorusGeometry, Vector2, Vector3,
+  SphereGeometry, TorusGeometry, Vector2, Vector3, SRGBColorSpace,
 } from 'three'
 
 /* ---------------- 材质与贴图 ---------------- */
@@ -33,6 +33,7 @@ function solarTexture(): CanvasTexture {
     ctx.stroke()
   }
   panelTex = new CanvasTexture(c)
+  panelTex.colorSpace = SRGBColorSpace
   panelTex.wrapS = panelTex.wrapT = RepeatWrapping
   panelTex.repeat.set(5, 2)
   return panelTex
@@ -58,6 +59,7 @@ function foilTexture(): CanvasTexture {
     ctx.stroke()
   }
   foilTex = new CanvasTexture(c)
+  foilTex.colorSpace = SRGBColorSpace
   return foilTex
 }
 
@@ -77,17 +79,17 @@ function put(parent: Object3D, mesh: Mesh, x = 0, y = 0, z = 0): Mesh {
   return mesh
 }
 
-/** 部件标签锚点：视图会把它投影到屏幕上标注名称 */
-function anchor(parent: Object3D, id: string, x: number, y: number, z: number) {
-  const o = new Object3D()
-  o.position.set(x, y, z)
-  o.userData.partId = id
-  parent.add(o)
-}
-
-/** 细杆（默认沿 Y 轴，用 rotation 改向） */
-function rod(len: number, r = 0.05, mat = hull()) {
-  return new Mesh(new CylinderGeometry(r, r, len, 10), mat)
+/** Every assembly owns its meshes and one physical annotation anchor. */
+function part(root: Group, id: string, position: [number, number, number]): Group {
+  const group = new Group()
+  group.name = id
+  group.userData.partId = id
+  const anchor = new Object3D()
+  anchor.name = 'anchor'
+  anchor.position.set(...position)
+  group.add(anchor)
+  root.add(group)
+  return group
 }
 
 const UP = new Vector3(0, 1, 0)
@@ -119,359 +121,242 @@ function wing(len: number, width: number) {
 }
 
 /* ---------------- 哈勃太空望远镜 ---------------- */
-
 function buildHubble(): Group {
-  const g = new Group()
-
-  // 镜筒（长轴沿 Z）+ 前端遮光罩 + 后端仪器舱
-  const tube = put(g, new Mesh(new CylinderGeometry(1.25, 1.25, 4.4, 32), foil()))
-  tube.rotation.x = Math.PI / 2
-  const shade = put(g, new Mesh(new CylinderGeometry(1.28, 1.28, 1.7, 32, 1, true), hull()), 0, 0, 3.0)
-  shade.rotation.x = Math.PI / 2
-  ;(shade.material as MeshPhongMaterial).side = DoubleSide
-  const aft = put(g, new Mesh(new CylinderGeometry(1.32, 1.32, 0.55, 32), white()), 0, 0, -2.4)
-  aft.rotation.x = Math.PI / 2
-  // 打开的舱门：铰接在遮光罩上沿，向外掀开
+  const root = new Group()
+  const tube = part(root, 'tube', [0, 1.25, 0])
+  put(tube, new Mesh(new CylinderGeometry(1.25, 1.25, 4.4, 40), hull())).rotation.x = Math.PI / 2
+  put(tube, new Mesh(new CylinderGeometry(1.32, 1.32, 0.55, 40), foil()), 0, 0, -2.4).rotation.x = Math.PI / 2
+  for (const z of [-1.8, -0.2, 1.8]) {
+    // TorusGeometry lies in XY already: the tube's long axis is Z.
+    put(tube, new Mesh(new TorusGeometry(1.27, 0.045, 8, 48), white()), 0, 0, z)
+  }
+  const aperture = part(root, 'aperture', [0, 1.28, 3.8])
+  put(aperture, new Mesh(new CylinderGeometry(1.28, 1.28, 1.5, 40, 1, true), new MeshPhongMaterial({ color: '#aeb8c7', side: DoubleSide })), 0, 0, 2.95).rotation.x = Math.PI / 2
+  put(aperture, new Mesh(new CircleGeometry(1.24, 40), dark()), 0, 0, 2.23)
+  put(aperture, new Mesh(new CircleGeometry(0.94, 40), hull()), 0, 0, 2.24)
   const hinge = new Group()
-  hinge.position.set(0, 1.28, 3.9)
-  hinge.rotation.x = -1.05
-  const door = new Mesh(new CircleGeometry(1.26, 28), hull())
-  door.position.set(0, 1.26, 0)
-  ;(door.material as MeshPhongMaterial).side = DoubleSide
-  hinge.add(door)
-  g.add(hinge)
-  // 筒身腰箍
-  for (const z of [-1.2, 0.4, 1.8]) {
-    const ring = put(g, new Mesh(new TorusGeometry(1.27, 0.05, 8, 40), hull()), 0, 0, z)
-    ring.rotation.y = Math.PI / 2
-    ring.rotation.x = Math.PI / 2
+  hinge.position.set(0, 1.28, 3.7)
+  hinge.rotation.x = -0.8
+  put(hinge, new Mesh(new CircleGeometry(1.26, 40), new MeshPhongMaterial({ color: '#d6dbe4', side: DoubleSide })), 0, 1.26, 0)
+  aperture.add(hinge)
+  const panels = part(root, 'panel', [3.4, 0, 0])
+  for (const side of [-1, 1]) {
+    link(panels, [side * 1.2, 0, 0], [side * 2.1, 0, 0], 0.075)
+    const panel = wing(3.2, 1.6)
+    panel.position.set(side * 3.6, 0, 0)
+    panels.add(panel)
   }
-
-  // 太阳翼（两片，沿 X 展开）
-  for (const s of [1, -1]) {
-    const w = wing(3.6, 1.5)
-    w.position.set(s * 3.3, 0, 0)
-    g.add(w)
-    put(g, rod(1.4, 0.07), s * 1.7, 0, 0).rotation.z = Math.PI / 2
+  const antenna = part(root, 'antenna', [0, 2.4, -1.3])
+  for (const side of [-1, 1]) {
+    link(antenna, [0, side * 1.15, -1.3], [0, side * 2.4, -1.3], 0.055)
+    put(antenna, new Mesh(new CylinderGeometry(0.44, 0.32, 0.14, 24), white()), 0, side * 2.4, -1.3)
   }
-
-  // 高增益天线（上下各一支，杆 + 碟）
-  for (const s of [1, -1]) {
-    put(g, rod(1.5, 0.06), 0, s * 1.9, -0.6)
-    const dish = put(g, new Mesh(new CylinderGeometry(0.5, 0.5, 0.07, 20), white()), 0, s * 2.6, -0.6)
-    dish.rotation.x = s * 0.4
-  }
-
-  anchor(g, 'tube', 0, 1.4, 0.6)
-  anchor(g, 'panel', 3.4, 0.3, 0)
-  anchor(g, 'antenna', 0, 2.9, -0.6)
-  anchor(g, 'aperture', 0, -1.5, 4.0)
-  return g
+  return root
 }
 
 /* ---------------- 国际空间站 ---------------- */
-
 function buildISS(): Group {
-  const g = new Group()
-
-  // 主桁架（沿 X）
-  put(g, new Mesh(new BoxGeometry(15, 0.38, 0.38), hull()))
-  for (let x = -7; x <= 7; x += 1) {
-    put(g, new Mesh(new BoxGeometry(0.1, 0.7, 0.1), hull()), x, 0, 0)
+  const root = new Group()
+  const truss = part(root, 'truss', [0, 0.3, 0])
+  // Four continuous rails and connected diagonal braces replace intersecting bars.
+  for (const y of [-0.22, 0.22]) for (const z of [-0.22, 0.22]) link(truss, [-8, y, z], [8, y, z], 0.045)
+  for (let x = -8; x < 8; x++) {
+    for (const z of [-0.22, 0.22]) link(truss, [x, -0.22, z], [x + 1, 0.22, z], 0.028)
+    for (const y of [-0.22, 0.22]) link(truss, [x, y, -0.22], [x + 1, y, 0.22], 0.028)
   }
-
-  // 8 片太阳翼：桁架两端各一组，每组前后各两片
-  for (const x of [-6.9, -5.0, 5.0, 6.9]) {
-    for (const z of [1, -1]) {
-      const w = wing(1.6, 3.4)
-      w.position.set(x, 0, z * 2.1)
-      g.add(w)
-    }
-    const joint = put(g, new Mesh(new CylinderGeometry(0.3, 0.3, 0.5, 16), white()), x, 0, 0)
-    joint.rotation.x = Math.PI / 2
-  }
-
-  // 散热板（白色，垂直于太阳翼）
-  for (const x of [-2.4, 2.4]) {
-    for (const s of [1, -1]) {
-      const rad = put(g, new Mesh(new BoxGeometry(1.2, 0.05, 2.6), white()), x, s * 1.1, 0)
-      rad.rotation.x = s * 0.5
+  const arrays = part(root, 'array', [6.7, 0, 4])
+  for (const x of [-6.7, -4.8, 4.8, 6.7]) for (const side of [-1, 1]) {
+    // Eight wings, each with two blankets attached to a central mast.
+    link(arrays, [x, 0, 0], [x, 0, side * 5.8], 0.045)
+    for (const dx of [-0.4, 0.4]) {
+      const panel = wing(0.7, 5.2)
+      panel.position.set(x + dx, 0, side * 3.15)
+      arrays.add(panel)
     }
   }
-
-  // 增压舱段：沿 Z 的主轴 + 两侧实验舱
-  const spine = put(g, new Mesh(new CylinderGeometry(0.55, 0.55, 5.4, 24), white()), 0, -0.55, 0)
-  spine.rotation.x = Math.PI / 2
-  for (const z of [-1.6, 0.6]) {
-    const node = put(g, new Mesh(new SphereGeometry(0.68, 20, 16), white()), 0, -0.55, z)
-    node.scale.set(1, 0.95, 1)
+  const modules = part(root, 'modules', [0, -0.65, 1.2])
+  link(modules, [0, 0, 0], [0, -0.65, 0], 0.25)
+  for (const [z, length, radius] of [[-2.1, 2.3, 0.45], [0, 1.8, 0.6], [2.0, 2.2, 0.54]]) {
+    put(modules, new Mesh(new CylinderGeometry(radius, radius, length, 28), white()), 0, -0.7, z).rotation.x = Math.PI / 2
   }
-  for (const s of [1, -1]) {
-    const lab = put(g, new Mesh(new CylinderGeometry(0.5, 0.5, 2.2, 20), white()), s * 1.5, -0.55, 0.6)
-    lab.rotation.z = Math.PI / 2
+  for (const z of [-0.85, 0.95]) put(modules, new Mesh(new SphereGeometry(0.62, 24, 16), hull()), 0, -0.7, z)
+  for (const side of [-1, 1]) put(modules, new Mesh(new CylinderGeometry(0.44, 0.44, 2.0, 24), white()), side * 1.35, -0.7, 1.05).rotation.z = Math.PI / 2
+  const radiator = part(root, 'radiator', [-2.4, 1.6, 0.6])
+  for (const x of [-2.5, 2.5]) {
+    link(radiator, [x, 0, 0], [x, 1.4, 0], 0.075)
+    link(radiator, [x - 0.74, 1.4, 0], [x + 0.74, 1.4, 0], 0.045)
+    for (const dx of [-0.5, 0, 0.5]) {
+      const panel = put(radiator, new Mesh(new BoxGeometry(0.44, 0.035, 2.4), white()), x + dx, 1.4, 0)
+      panel.rotation.x = 0.55
+    }
   }
-  // 对接的飞船（联盟/货运）
-  const ship = put(g, new Mesh(new CylinderGeometry(0.34, 0.34, 1.1, 16), foil()), 0, -0.55, -3.3)
-  ship.rotation.x = Math.PI / 2
-  put(g, new Mesh(new ConeGeometry(0.34, 0.5, 16), dark()), 0, -0.55, -4.05).rotation.x = -Math.PI / 2
-
-  anchor(g, 'truss', 0, 0.6, 0)
-  anchor(g, 'array', 6.9, 0, 3.2)
-  anchor(g, 'modules', 0, -1.4, 1.6)
-  anchor(g, 'radiator', -2.4, 1.7, 0)
-  anchor(g, 'docked', 0, -0.55, -4.6)
-  return g
+  const docked = part(root, 'docked', [0, -0.7, -4.1])
+  put(docked, new Mesh(new CylinderGeometry(0.34, 0.34, 1.1, 24), foil()), 0, -0.7, -3.65).rotation.x = Math.PI / 2
+  put(docked, new Mesh(new SphereGeometry(0.34, 24, 16), white()), 0, -0.7, -4.25)
+  return root
 }
 
-/* ---------------- 天宫空间站 ---------------- */
-
+/* ---------------- 天宫空间站：T 字舱体与实际对接方向 ---------------- */
 function buildTiangong(): Group {
-  const g = new Group()
-
-  // 天和核心舱（沿 X）：大柱段 + 小柱段 + 前端节点舱
-  const big = put(g, new Mesh(new CylinderGeometry(0.95, 0.95, 2.4, 24), white()), -0.6, 0, 0)
-  big.rotation.z = Math.PI / 2
-  const small = put(g, new Mesh(new CylinderGeometry(0.62, 0.62, 1.6, 24), white()), 1.4, 0, 0)
-  small.rotation.z = Math.PI / 2
-  put(g, new Mesh(new SphereGeometry(0.8, 24, 18), white()), 2.6, 0, 0) // 节点舱
-
-  // 问天 / 梦天实验舱：从节点舱向 ±Z 伸出，构成 T 字
-  for (const s of [1, -1]) {
-    const lab = put(g, new Mesh(new CylinderGeometry(0.8, 0.8, 3.0, 24), white()), 2.6, 0, s * 2.3)
-    lab.rotation.x = Math.PI / 2
-    put(g, new Mesh(new CylinderGeometry(0.5, 0.5, 0.7, 20), hull()), 2.6, 0, s * 4.1).rotation.x = Math.PI / 2
-    // 实验舱柔性太阳翼
-    for (const t of [1, -1]) {
-      const w = wing(3.4, 1.15)
-      w.position.set(2.6 + t * 2.6, 0, s * 3.0)
-      g.add(w)
-    }
+  const root = new Group()
+  const core = part(root, 'core', [0, 0.8, -1.8])
+  put(core, new Mesh(new CylinderGeometry(0.78, 0.78, 2.6, 32), white()), 0, 0, -1.8).rotation.x = Math.PI / 2
+  put(core, new Mesh(new CylinderGeometry(0.5, 0.5, 1.1, 28), hull()), 0, 0, 0).rotation.x = Math.PI / 2
+  put(core, new Mesh(new SphereGeometry(0.66, 28, 20), white()), 0, 0, 0.8)
+  for (const side of [-1, 1]) {
+    const lab = part(root, side < 0 ? 'wentian' : 'mengtian', [side * 2.5, 0.65, 0.8])
+    put(lab, new Mesh(new CylinderGeometry(0.37, 0.37, 0.55, 24), hull()), side * 0.7, 0, 0.8).rotation.z = Math.PI / 2
+    put(lab, new Mesh(new CylinderGeometry(0.62, 0.62, 3.2, 28), white()), side * 2.5, 0, 0.8).rotation.z = Math.PI / 2
+    put(lab, new Mesh(new CylinderGeometry(0.45, 0.45, 0.7, 24), hull()), side * 4.4, 0, 0.8).rotation.z = Math.PI / 2
   }
-
-  // 核心舱柔性太阳翼
-  for (const s of [1, -1]) {
-    const w = wing(1.15, 3.4)
-    w.position.set(-1.2, 0, s * 2.5)
-    g.add(w)
+  const wings = part(root, 'wings', [4.4, 0, 4.0])
+  for (const x of [-4.4, 4.4]) for (const side of [-1, 1]) {
+    link(wings, [x, 0, 0.8], [x, 0, 0.8 + side * 1.0], 0.065)
+    const panel = wing(1.05, 4.0)
+    panel.position.set(x, 0, 0.8 + side * 2.8)
+    wings.add(panel)
   }
-
-  // 尾端对接的神舟载人飞船 + 节点舱径向的天舟货运飞船
-  const sz = put(g, new Mesh(new CylinderGeometry(0.42, 0.42, 1.2, 18), foil()), -2.6, 0, 0)
-  sz.rotation.z = Math.PI / 2
-  put(g, new Mesh(new SphereGeometry(0.42, 18, 14), white()), -3.4, 0, 0)
-  const tz = put(g, new Mesh(new CylinderGeometry(0.5, 0.5, 1.5, 18), hull()), 2.6, -1.9, 0)
-  tz.rotation.x = 0
-
-  anchor(g, 'core', -0.6, 1.3, 0)
-  anchor(g, 'wentian', 2.6, -1.2, 3.4)
-  anchor(g, 'mengtian', 2.6, 1.2, -3.4)
-  anchor(g, 'wings', 5.4, 0.5, 3.0)
-  anchor(g, 'shenzhou', -3.9, 0.6, 0)
-  anchor(g, 'tianzhou', 2.6, -2.7, 0)
-  return g
+  for (const side of [-1, 1]) {
+    link(wings, [side * 0.7, 0, -2.6], [side * 1.1, 0, -2.6], 0.06)
+    const panel = wing(2.4, 0.95)
+    panel.position.set(side * 2.2, 0, -2.6)
+    wings.add(panel)
+  }
+  // Shenzhou at the forward node; Tianzhou at Tianhe's aft port.
+  const crew = part(root, 'shenzhou', [0, 0.45, 2.8])
+  put(crew, new Mesh(new CylinderGeometry(0.3, 0.3, 0.65, 24), white()), 0, 0, 1.7).rotation.x = Math.PI / 2
+  put(crew, new Mesh(new SphereGeometry(0.36, 24, 16), hull()), 0, 0, 2.3)
+  put(crew, new Mesh(new CylinderGeometry(0.35, 0.35, 0.7, 24), foil()), 0, 0, 2.95).rotation.x = Math.PI / 2
+  const cargo = part(root, 'tianzhou', [0, 0.5, -4.2])
+  put(cargo, new Mesh(new CylinderGeometry(0.3, 0.3, 0.4, 24), hull()), 0, 0, -3.25).rotation.x = Math.PI / 2
+  put(cargo, new Mesh(new CylinderGeometry(0.51, 0.51, 1.5, 28), white()), 0, 0, -4.15).rotation.x = Math.PI / 2
+  put(cargo, new Mesh(new CylinderGeometry(0.4, 0.4, 0.5, 24), foil()), 0, 0, -5.1).rotation.x = Math.PI / 2
+  return root
 }
 
-/* ---------------- 詹姆斯·韦布空间望远镜 ---------------- */
-
+/* ---------------- 韦伯：镜片共面，镜面与遮阳罩近乎垂直 ---------------- */
 function buildJWST(): Group {
-  const g = new Group()
-
-  // 主镜：18 块正六边形（中心一块空缺），六边形朝 +Y
-  const r = 0.44
-  const d = r * Math.sqrt(3) // 相邻镜面中心距
-  const centers: [number, number][] = []
-  for (let k = 0; k < 6; k++) {
-    const a1 = Math.PI / 6 + (k * Math.PI) / 3
-    const a2 = (k * Math.PI) / 3
-    centers.push([Math.cos(a1) * d, Math.sin(a1) * d]) // 内环 6 块
-    centers.push([Math.cos(a1) * 2 * d, Math.sin(a1) * 2 * d]) // 外环 6 块
-    centers.push([Math.cos(a2) * d * Math.sqrt(3), Math.sin(a2) * d * Math.sqrt(3)]) // 外环另 6 块
+  const root = new Group()
+  const primary = part(root, 'primary', [0, 2.25, -0.9])
+  const r = 0.52, gap = 1.015
+  for (let q = -2; q <= 2; q++) for (let row = -2; row <= 2; row++) {
+    if (Math.max(Math.abs(q), Math.abs(row), Math.abs(q + row)) > 2 || (q === 0 && row === 0)) continue
+    const x = Math.sqrt(3) * r * (q + row / 2) * gap
+    const y = 2.25 + 1.5 * r * row * gap
+    const segment = put(primary, new Mesh(new CylinderGeometry(r, r, 0.075, 6), gold()), x, y, -0.9)
+    segment.rotation.x = Math.PI / 2
+    segment.userData.mirrorSegment = true
   }
-  const mirror = new Group()
-  g.add(mirror)
-  for (const [x, z] of centers) {
-    put(mirror, new Mesh(new CylinderGeometry(r, r, 0.07, 6), gold()), x, 0, z)
-  }
-  // 背面桁架
-  put(g, new Mesh(new BoxGeometry(3.4, 0.12, 0.5), dark()), 0, -0.16, 0)
-
-  // 副镜 + 三脚支架（杆件按端点连接，落在主镜边缘）
-  put(g, new Mesh(new CylinderGeometry(0.36, 0.36, 0.06, 24), gold()), 0, 2.6, 0)
-  for (const a of [Math.PI / 2, (7 * Math.PI) / 6, (11 * Math.PI) / 6]) {
-    link(g, [Math.cos(a) * 1.75, 0.05, Math.sin(a) * 1.75], [0, 2.58, 0], 0.035)
-  }
-
-  // 五层遮阳罩（风筝形，逐层略小）
-  const kite = (scale: number) => {
-    const s = new Shape()
-    s.moveTo(0, 2.7 * scale)
-    s.lineTo(3.3 * scale, 0.1 * scale)
-    s.lineTo(0, -3.0 * scale)
-    s.lineTo(-3.3 * scale, 0.1 * scale)
-    s.closePath()
-    return new ShapeGeometry(s)
-  }
+  put(primary, new Mesh(new CylinderGeometry(r * 0.93, r * 0.93, 0.1, 6), dark()), 0, 2.25, -0.9).rotation.x = Math.PI / 2
+  put(primary, new Mesh(new BoxGeometry(3.2, 2.8, 0.18), dark()), 0, 2.25, -1.08)
+  link(primary, [-0.65, -0.75, -1.1], [-0.65, 1.3, -1.1], 0.12, dark())
+  link(primary, [0.65, -0.75, -1.1], [0.65, 1.3, -1.1], 0.12, dark())
+  const secondary = part(root, 'secondary', [0, 2.25, 1.65])
+  put(secondary, new Mesh(new CylinderGeometry(0.24, 0.24, 0.1, 28), gold()), 0, 2.25, 1.65).rotation.x = Math.PI / 2
+  for (const [x, y] of [[0, 4.1], [-1.62, 1.3], [1.62, 1.3]]) link(secondary, [x, y, -0.9], [0, 2.25, 1.6], 0.04, dark())
+  const shield = part(root, 'sunshield', [2.9, -0.7, 0])
   for (let i = 0; i < 5; i++) {
-    const layer = new Mesh(
-      kite(1 - i * 0.05),
-      new MeshPhongMaterial({
-        color: i === 0 ? 0xb0b8c6 : 0x8f98a8,
-        side: DoubleSide,
-        shininess: 90,
-        transparent: true,
-        opacity: 0.92,
-      }),
-    )
-    layer.rotation.x = -Math.PI / 2
-    layer.position.set(0, -1.4 - i * 0.3, 0)
-    g.add(layer)
+    const scale = 1 - i * 0.025
+    const outline = new Shape()
+    outline.moveTo(0, 5.2 * scale)
+    outline.lineTo(3.25 * scale, 0.3)
+    outline.lineTo(0, -5.2 * scale)
+    outline.lineTo(-3.25 * scale, 0.3)
+    outline.closePath()
+    const sheet = put(shield, new Mesh(new ShapeGeometry(outline), new MeshPhongMaterial({ color: i % 2 ? '#a4aab5' : '#cbd0db', side: DoubleSide, shininess: 55 })), 0, -1 + i * 0.105, 0)
+    sheet.rotation.x = -Math.PI / 2
+    sheet.userData.shieldLayer = true
   }
-
-  // 航天器总线 + 太阳翼（遮阳罩背阳面之下）
-  put(g, new Mesh(new BoxGeometry(1.7, 0.7, 1.4), hull()), 0, -3.3, 0)
-  const sw = wing(2.0, 1.0)
-  sw.position.set(0, -3.9, 0)
-  sw.rotation.z = 0.25
-  g.add(sw)
-  // 高增益天线
-  put(g, new Mesh(new CylinderGeometry(0.32, 0.32, 0.06, 20), white()), 1.2, -3.7, 0.4).rotation.z = 0.6
-
-  anchor(g, 'primary', 0, 0.55, 1.9)
-  anchor(g, 'secondary', 0, 3.0, 0)
-  anchor(g, 'sunshield', 3.5, -2.0, 0)
-  anchor(g, 'bus', 0, -4.4, 0.9)
-  return g
+  for (const [x, z] of [[0, 5.2], [0, -5.2], [3.25, -0.3], [-3.25, -0.3]]) link(shield, [0, -1.1, 0], [x, -1, z], 0.04, dark())
+  const bus = part(root, 'bus', [0, -1.65, 0])
+  put(bus, new Mesh(new BoxGeometry(1.65, 0.8, 1.5), foil()), 0, -1.5, 0)
+  link(bus, [0.8, -1.7, 0], [1.5, -1.7, 0], 0.07)
+  const panel = wing(2.0, 1.0)
+  panel.position.set(2.45, -1.7, 0)
+  bus.add(panel)
+  link(bus, [0, -1.8, 0], [0, -2.3, 0], 0.06)
+  put(bus, new Mesh(new CylinderGeometry(0.35, 0.3, 0.1, 24), white()), 0, -2.3, 0)
+  return root
 }
 
-/* ---------------- 旅行者 1 号 ---------------- */
-
+/* ---------------- 旅行者：所有伸杆都从总线连接，避开天线碟 ---------------- */
 function buildVoyager(): Group {
-  const g = new Group()
-
-  // 高增益天线：抛物面（开口朝 +Y）+ 边框 + 馈源
-  const profile: Vector2[] = []
-  for (let i = 0; i <= 14; i++) {
-    const rr = (i / 14) * 2.0
-    profile.push(new Vector2(rr, rr * rr * 0.26))
-  }
-  const dish = put(g, new Mesh(new LatheGeometry(profile, 48), white()))
-  ;(dish.material as MeshPhongMaterial).side = DoubleSide
-  put(g, new Mesh(new TorusGeometry(2.0, 0.04, 8, 48), hull()), 0, 1.04, 0).rotation.x = Math.PI / 2
-  put(g, rod(1.1, 0.04), 0, 0.75, 0)
-  put(g, new Mesh(new ConeGeometry(0.16, 0.3, 12), dark()), 0, 1.35, 0)
-
-  // 十面体总线
-  const bus = put(g, new Mesh(new CylinderGeometry(0.85, 0.85, 0.45, 10), foil()), 0, -0.5, 0)
-  bus.rotation.y = Math.PI / 10
-
-  // RTG 桁杆（-X 方向 3 台同位素电源）
-  const boom = put(g, rod(2.6, 0.05), -1.6, -0.6, 0)
-  boom.rotation.z = Math.PI / 2
+  const root = new Group()
+  const dish = part(root, 'dish', [0, 1.04, 2])
+  const profile = Array.from({ length: 25 }, (_, i) => { const r = i / 24 * 2; return new Vector2(r, r * r * 0.26) })
+  put(dish, new Mesh(new LatheGeometry(profile, 64), new MeshPhongMaterial({ color: '#edf0f2', side: DoubleSide, shininess: 35 })))
+  put(dish, new Mesh(new TorusGeometry(2, 0.035, 8, 64), hull()), 0, 1.04, 0).rotation.x = Math.PI / 2
+  link(dish, [0, -0.65, 0], [0, 0.12, 0], 0.25)
+  put(dish, new Mesh(new CylinderGeometry(0.85, 0.85, 0.5, 10), foil()), 0, -0.6, 0)
+  link(dish, [0, 0, 0], [0, 1.25, 0], 0.04)
+  put(dish, new Mesh(new ConeGeometry(0.16, 0.25, 20), dark()), 0, 1.3, 0)
+  const rtgs = part(root, 'rtg', [-3.1, -0.6, 0])
+  link(rtgs, [-0.6, -0.6, 0], [-3.7, -0.6, 0], 0.075)
   for (let i = 0; i < 3; i++) {
-    const rtg = put(g, new Mesh(new CylinderGeometry(0.2, 0.2, 0.62, 14), dark()), -1.9 - i * 0.68, -0.6, 0)
-    rtg.rotation.z = Math.PI / 2
-    put(g, new Mesh(new TorusGeometry(0.21, 0.03, 6, 16), hull()), -1.9 - i * 0.68, -0.6, 0).rotation.y = Math.PI / 2
+    const x = -1.8 - i * 0.68
+    put(rtgs, new Mesh(new CylinderGeometry(0.22, 0.22, 0.6, 20), dark()), x, -0.6, 0).rotation.z = Math.PI / 2
+    for (const dx of [-0.2, 0, 0.2]) put(rtgs, new Mesh(new TorusGeometry(0.27, 0.035, 6, 20), hull()), x + dx, -0.6, 0).rotation.y = Math.PI / 2
   }
-
-  // 科学平台（+X）：扫描平台与相机
-  const sci = put(g, rod(1.5, 0.05), 1.2, -0.7, 0)
-  sci.rotation.z = Math.PI / 2
-  put(g, new Mesh(new BoxGeometry(0.6, 0.5, 0.5), hull()), 2.1, -0.75, 0)
-  put(g, new Mesh(new CylinderGeometry(0.14, 0.14, 0.7, 12), dark()), 2.1, -0.75, 0.55).rotation.x = Math.PI / 2
-
-  // 磁强计伸杆（真机 13 m，斜向后上）+ 两根等离子体波天线（张开成 V 形）
-  link(g, [-0.6, -0.5, -0.4], [-4.2, 2.6, -3.0], 0.025)
-  link(g, [0.3, -0.7, 0.3], [3.0, -1.4, 4.6], 0.025)
-  link(g, [-0.3, -0.7, 0.3], [-3.0, -1.4, 4.6], 0.025)
-
-  // 金唱片（挂在总线侧面）
-  const record = put(g, new Mesh(new CircleGeometry(0.38, 32), gold()), 0.72, -0.5, 0.5)
-  record.rotation.y = 0.7
-  ;(record.material as MeshPhongMaterial).side = DoubleSide
-
-  anchor(g, 'dish', 0, 1.7, 1.6)
-  anchor(g, 'rtg', -3.6, -1.3, 0)
-  anchor(g, 'boom', -3.6, 3.0, -3.6)
-  anchor(g, 'record', 1.4, -0.9, 1.0)
-  anchor(g, 'instruments', 2.6, -1.4, 0)
-  return g
+  const instruments = part(root, 'instruments', [2.15, -0.65, 0.6])
+  link(instruments, [0.6, -0.65, 0], [2.1, -0.65, 0], 0.09)
+  put(instruments, new Mesh(new BoxGeometry(0.7, 0.45, 0.6), hull()), 2.1, -0.65, 0)
+  for (const x of [1.94, 2.28]) put(instruments, new Mesh(new CylinderGeometry(0.12, 0.12, 0.65, 20), dark()), x, -0.65, 0.6).rotation.x = Math.PI / 2
+  const boom = part(root, 'boom', [-8.4, -0.65, -6.5])
+  const base = new Vector3(-0.6, -0.65, -0.4), tip = new Vector3(-8.4, -0.65, -6.5)
+  link(boom, base.toArray() as [number, number, number], tip.toArray() as [number, number, number], 0.035, dark())
+  for (let i = 0; i < 22; i++) {
+    const p = base.clone().lerp(tip, i / 22), next = base.clone().lerp(tip, (i + 1) / 22)
+    for (const y of [-0.08, 0.08]) link(boom, [p.x, p.y + y, p.z], [next.x, next.y - y, next.z], 0.018)
+  }
+  put(boom, new Mesh(new BoxGeometry(0.15, 0.15, 0.18), dark()), tip.x, tip.y, tip.z)
+  for (const side of [-1, 1]) link(instruments, [side * 0.3, -0.8, 0.3], [side * 3, -1.4, 4.6], 0.018)
+  const record = part(root, 'record', [0.72, -0.6, 0.5])
+  put(record, new Mesh(new CircleGeometry(0.33, 40), new MeshPhongMaterial({ color: '#ddb653', side: DoubleSide, shininess: 80 })), 0.72, -0.6, 0.5).rotation.y = 0.95
+  return root
 }
 
-/* ---------------- 阿波罗登月舱 ---------------- */
-
+/* ---------------- 阿波罗：前腿、舷梯与舱门处于同一平面 ---------------- */
 function buildApolloLM(): Group {
-  const g = new Group()
-
-  // 下降级：八角柱 + 下降发动机
-  const desc = put(g, new Mesh(new CylinderGeometry(1.75, 1.75, 0.9, 8), foil()), 0, -0.1, 0)
-  desc.rotation.y = Math.PI / 8
-  put(g, new Mesh(new ConeGeometry(0.55, 0.8, 18, 1, true), dark()), 0, -0.95, 0).rotation.x = Math.PI
-
-  // 4 条着陆腿：主支柱 + 两根斜撑 + 圆盘足垫
+  const root = new Group()
+  const descent = part(root, 'descent', [1.3, -0.1, 0])
+  put(descent, new Mesh(new CylinderGeometry(1.65, 1.65, 0.9, 8), foil()), 0, -0.1, 0).rotation.y = Math.PI / 8
+  // Cone opens toward -Y: no upside-down engine bell.
+  put(descent, new Mesh(new ConeGeometry(0.5, 0.65, 24, 1, true), dark()), 0, -0.85, 0)
+  const legs = part(root, 'legs', [2.6, -1.5, 0])
   for (let i = 0; i < 4; i++) {
-    const a = Math.PI / 4 + (i * Math.PI) / 2
-    const dx = Math.cos(a)
-    const dz = Math.sin(a)
-    const foot: [number, number, number] = [dx * 2.6, -1.5, dz * 2.6]
-    link(g, [dx * 1.3, -0.35, dz * 1.3], foot, 0.075)
-    // 斜撑：从下降级上沿撑到腿的中段
-    const mid: [number, number, number] = [dx * 2.0, -0.95, dz * 2.0]
-    link(g, [dx * 1.6 - dz * 0.5, 0.3, dz * 1.6 + dx * 0.5], mid, 0.04)
-    link(g, [dx * 1.6 + dz * 0.5, 0.3, dz * 1.6 - dx * 0.5], mid, 0.04)
-    put(g, new Mesh(new CylinderGeometry(0.36, 0.36, 0.1, 16), hull()), foot[0], foot[1], foot[2])
+    const a = i * Math.PI / 2, x = Math.cos(a), z = Math.sin(a)
+    const foot: [number, number, number] = [x * 2.6, -1.5, z * 2.6]
+    link(legs, [x * 1.2, 0.1, z * 1.2], foot, 0.075)
+    for (const s of [-1, 1]) link(legs, [x * 1.3 + z * s * 0.5, 0.25, z * 1.3 - x * s * 0.5], [x * 2, -0.8, z * 2], 0.04)
+    const pad = put(legs, new Mesh(new CylinderGeometry(0.34, 0.34, 0.09, 24), hull()), ...foot)
+    pad.userData.landingPad = true
   }
-
-  // 上升级：乘员舱 + 前窗 + 舱门 + 对接口
-  const asc = put(g, new Mesh(new CylinderGeometry(1.15, 1.15, 1.05, 12), white()), 0, 0.9, 0)
-  asc.rotation.y = Math.PI / 12
-  const cabin = put(g, new Mesh(new BoxGeometry(1.5, 0.95, 0.7), white()), 0, 0.85, 1.1)
-  cabin.rotation.x = 0
-  for (const s of [1, -1]) {
-    const win = put(g, new Mesh(new BoxGeometry(0.4, 0.32, 0.06), dark()), s * 0.38, 1.05, 1.46)
-    win.rotation.x = -0.35
+  const ascent = part(root, 'ascent', [0.8, 0.9, 0.7])
+  put(ascent, new Mesh(new CylinderGeometry(1.08, 1.08, 1.05, 8), white()), 0, 0.9, 0).rotation.y = Math.PI / 8
+  put(ascent, new Mesh(new BoxGeometry(1.45, 0.95, 0.8), hull()), 0, 0.85, 0.95)
+  for (const side of [-1, 1]) {
+    const window = new Shape()
+    window.moveTo(-0.2, -0.16); window.lineTo(0.2, -0.16); window.lineTo(side * 0.1, 0.2); window.closePath()
+    put(ascent, new Mesh(new ShapeGeometry(window), dark()), side * 0.37, 1.05, 1.36)
+    put(ascent, new Mesh(new SphereGeometry(0.38, 20, 14), foil()), side * 1.04, 0.85, -0.4)
   }
-  put(g, new Mesh(new BoxGeometry(0.55, 0.6, 0.06), dark()), 0, 0.55, 1.46)
-  // 对接口 + 顶部舱盖
-  put(g, new Mesh(new ConeGeometry(0.5, 0.45, 16, 1, true), hull()), 0, 1.62, 0)
-  put(g, new Mesh(new CylinderGeometry(0.28, 0.28, 0.3, 16), white()), 0, 1.95, 0)
-  // 姿控推进器（四组，每组 4 个）
-  for (let i = 0; i < 4; i++) {
-    const a = Math.PI / 4 + (i * Math.PI) / 2
-    const q = new Group()
-    q.position.set(Math.cos(a) * 1.35, 1.35, Math.sin(a) * 1.35)
-    for (const [ox, oy] of [[0.12, 0.1], [-0.12, 0.1], [0.12, -0.1], [-0.12, -0.1]]) {
-      put(q, new Mesh(new ConeGeometry(0.07, 0.16, 8), dark()), ox, oy, 0)
-    }
-    g.add(q)
+  put(ascent, new Mesh(new BoxGeometry(0.5, 0.55, 0.04), dark()), 0, 0.6, 1.37)
+  const docking = part(root, 'docking', [0, 1.84, 0])
+  put(docking, new Mesh(new CylinderGeometry(0.3, 0.48, 0.3, 28, 1, true), hull()), 0, 1.55, 0)
+  put(docking, new Mesh(new TorusGeometry(0.3, 0.055, 8, 32), white()), 0, 1.72, 0).rotation.x = Math.PI / 2
+  const ladder = part(root, 'ladder', [0, -0.7, 2.1])
+  put(ladder, new Mesh(new BoxGeometry(0.6, 0.06, 0.5), hull()), 0, 0.3, 1.6)
+  for (const x of [-0.2, 0.2]) link(ladder, [x, 0.3, 1.8], [x, -1.42, 2.6], 0.03)
+  for (let i = 0; i < 8; i++) {
+    const t = i / 7
+    link(ladder, [-0.2, 0.3 - 1.72 * t, 1.8 + 0.8 * t], [0.2, 0.3 - 1.72 * t, 1.8 + 0.8 * t], 0.025)
   }
-  // 舷梯：从舱门下沿接到前腿足垫
-  link(g, [0, 0.3, 1.45], [0.15, -1.35, 2.45], 0.035)
-  link(g, [-0.3, 0.3, 1.45], [-0.15, -1.35, 2.45], 0.035)
-  for (let i = 0; i < 6; i++) {
-    const t = i / 6
-    put(g, new Mesh(new BoxGeometry(0.45, 0.03, 0.05), hull()), -0.08, 0.3 - t * 1.6, 1.45 + t * 1.0)
-  }
-
-  anchor(g, 'ascent', 0, 2.3, 0)
-  anchor(g, 'descent', 0, -0.1, 2.1)
-  anchor(g, 'legs', 2.9, -1.9, 0)
-  anchor(g, 'docking', 0, 1.6, -1.1)
-  anchor(g, 'ladder', -1.3, -1.2, 2.2)
-  return g
+  return root
 }
 
-/* ---------------- 出口 ---------------- */
-
-const BUILDERS: Record<string, () => Group> = {
-  hubble: buildHubble,
-  iss: buildISS,
-  tiangong: buildTiangong,
-  jwst: buildJWST,
-  voyager1: buildVoyager,
-  apolloLm: buildApolloLM,
-}
-
-/** 按 id 搭建模型；未知 id 返回空组 */
+const BUILDERS: Record<string, () => Group> = { hubble: buildHubble, iss: buildISS, tiangong: buildTiangong, jwst: buildJWST, voyager1: buildVoyager, apolloLm: buildApolloLM }
 export function buildCraft(id: string): Group {
-  return (BUILDERS[id] ?? (() => new Group()))()
+  const model = (BUILDERS[id] ?? buildHubble)()
+  model.name = id
+  return model
 }

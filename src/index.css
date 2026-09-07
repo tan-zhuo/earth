@@ -98,3 +98,22 @@ button:focus-visible, a:focus-visible {
   .space-info, .space-info.is-expanded { left: auto; top: 90px; right: 16px; bottom: 60px; width: 360px; max-height: none; }
   .space-layers { top: auto; left: 20px; right: 400px; bottom: 48px; justify-content: center; }
 }
+
+.model-stage { position: absolute; inset: 172px 12px 264px; z-index: 0; background: radial-gradient(ellipse at center, #0c192a50, transparent 70%); }
+.model-stage.pointer-events-none { background: none; }
+.model-picker { position: fixed; top: 76px; left: 16px; right: 16px; z-index: 20; }
+.model-tools { position: fixed; top: 124px; left: 12px; right: 12px; z-index: 20; display: flex; gap: 3px; overflow-x: auto; }
+.model-info { position: fixed; bottom: 16px; left: 12px; right: 12px; z-index: 20; max-height: 236px; display: flex; flex-direction: column; border: 1px solid #33415599; border-radius: 16px; background: #0f172af2; backdrop-filter: blur(16px); overflow: hidden; }
+.model-pin { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; width: 28px; height: 28px; border: 1px solid #64748b; border-radius: 50%; color: #cbd5e1; background: #0f172ae6; font: 11px system-ui; }
+.model-pin:hover, .model-pin[aria-pressed='true'] { border-color: #7dd3fc; background: #0c4a6e; color: white; }
+@media (min-width: 768px) {
+  .model-stage { inset: 172px 396px 52px 20px; }
+  .model-picker { right: 416px; }
+  .model-tools { right: 400px; left: 20px; }
+  .model-info { top: 80px; right: 16px; bottom: 40px; left: auto; width: 360px; max-height: none; }
+}
+
+.model-legend { position: absolute; top: 166px; left: 16px; right: 16px; z-index: 10; display: flex; flex-wrap: wrap; gap: 4px; }
+@media (min-width: 768px) { .model-legend { left: 24px; right: 408px; } }
+.structure-stage { top: 216px; }
+@media (min-width: 768px) { .structure-stage { top: 200px; } }

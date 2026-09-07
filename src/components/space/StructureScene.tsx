@@ -1,11 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  AmbientLight, BackSide, BufferGeometry, DirectionalLight, DoubleSide, Float32BufferAttribute,
+  BufferGeometry, DoubleSide, Float32BufferAttribute,
   Group, Line, LineBasicMaterial, LineDashedMaterial, Mesh, MeshBasicMaterial, MeshPhongMaterial,
-  PerspectiveCamera, RingGeometry, Scene, SphereGeometry, SRGBColorSpace, TextureLoader,
-  Vector3, WebGLRenderer, AdditiveBlending,
+  RingGeometry, Sphere, SphereGeometry, SRGBColorSpace, TextureLoader,
+  Vector3, AdditiveBlending,
 } from 'three'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { createModelScene, disposeModelTree } from './modelScene'
 import { useTranslation } from 'react-i18next'
 import type { StructureConfig } from '../../data/structures'
 
@@ -29,36 +29,21 @@ export default function StructureScene({
   const zh = i18n.language.startsWith('zh')
   const showFieldRef = useRef(showField)
   showFieldRef.current = showField
-  const fieldGroupRef = useRef<Group | null>(null)
+  const runtimeRef = useRef<ReturnType<typeof createModelScene> | null>(null)
+  const [rotate, setRotate] = useState(false)
+  const rotateRef = useRef(false)
+  rotateRef.current = rotate
 
   useEffect(() => {
     const el = containerRef.current
     const labelLayer = labelsRef.current
     if (!el || !labelLayer) return
 
-    const scene = new Scene()
-    const camera = new PerspectiveCamera(45, el.clientWidth / el.clientHeight, 0.1, 5000)
-    // 初始相机正对剖面楔口（楔口朝向 -X-Z）
-    camera.position.set(-235, 130, -235)
-    const renderer = new WebGLRenderer({ antialias: true })
-    renderer.setSize(el.clientWidth, el.clientHeight)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    el.appendChild(renderer.domElement)
-    const controls = new OrbitControls(camera, renderer.domElement)
-    controls.enableDamping = true
-    controls.minDistance = 130
-    controls.maxDistance = 450
-
-    scene.add(new AmbientLight(0xffffff, 0.85))
-    const dir = new DirectionalLight(0xffffff, 1.4)
-    dir.position.set(-150, 120, -180) // 照亮剖面一侧
-    scene.add(dir)
-
-    // 星空背景
+    const runtime = createModelScene(el, new Vector3(-1, 0.55, -1.5))
+    runtimeRef.current = runtime
+    const { scene, controls } = runtime
     const loader = new TextureLoader()
-    const skyTex = loader.load('/textures/night-sky.png')
-    skyTex.colorSpace = SRGBColorSpace
-    scene.add(new Mesh(new SphereGeometry(3000, 32, 32), new MeshBasicMaterial({ map: skyTex, side: BackSide })))
+    let disposed = false
 
     const body = new Group()
     scene.add(body)
@@ -71,7 +56,7 @@ export default function StructureScene({
         : new SphereGeometry(layer.rOuter, 64, 48, 0, PHI_LEN)
       let mat: MeshPhongMaterial
       if (idx === 0 && config.surfaceTexture) {
-        const tex = loader.load(config.surfaceTexture)
+        const tex = loader.load(config.surfaceTexture, texture => { if (disposed) texture.dispose() })
         tex.colorSpace = SRGBColorSpace
         mat = new MeshPhongMaterial({ map: tex, side: DoubleSide, shininess: 4 })
       } else {
@@ -89,7 +74,7 @@ export default function StructureScene({
           )
           face.rotation.y = rotY
           // 切面颜色比壳体略暗，体现剖面
-          ;(face.material as MeshBasicMaterial).color.multiplyScalar(0.72)
+          ;(face.material as MeshBasicMaterial).color.multiplyScalar(rotY === Math.PI ? 0.92 : 0.62)
           body.add(face)
         }
       }
@@ -98,7 +83,6 @@ export default function StructureScene({
     // 磁场可视化
     const fieldGroup = new Group()
     fieldGroup.visible = showFieldRef.current
-    fieldGroupRef.current = fieldGroup
     body.add(fieldGroup)
 
     if (config.fieldType === 'dipole') {
@@ -129,7 +113,11 @@ export default function StructureScene({
       }
     } else {
       // 残余地壳磁场：南半球短弧
-      const rand = (min: number, max: number) => min + Math.random() * (max - min)
+      let seed = 42
+      const rand = (min: number, max: number) => {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+        return min + seed / 4294967296 * (max - min)
+      }
       for (let i = 0; i < 26; i++) {
         const lat = rand(-78, -22) * (Math.PI / 180)
         const lng = rand(0, 360) * (Math.PI / 180)
@@ -161,63 +149,42 @@ export default function StructureScene({
       }
     }
 
-    // 层名标签：沿 -X 剖切面呈对角瀑布排布（每层角度递增，避免薄层重叠）
-    const labelDefs = config.layers.map((layer, idx) => {
-      const rInner = config.layers[idx + 1]?.rOuter ?? 0
-      const rMid = Math.max((layer.rOuter + rInner) / 2, 14)
+    // A fixed color legend stays readable at every orbit angle and scale.
+    const labelDefs = config.layers.map(layer => {
       const span = document.createElement('span')
-      span.textContent = zh ? layer.nameZh : layer.nameEn
-      span.style.cssText =
-        'position:absolute;transform:translate(-50%,-50%);font-size:11px;font-family:system-ui;' +
-        'color:#f1f5f9;text-shadow:0 0 5px rgba(2,6,23,.95);pointer-events:none;white-space:nowrap'
+      span.style.cssText = 'display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#e2e8f0;padding:3px 6px;background:#020617bb;border-radius:4px'
+      const dot = document.createElement('i')
+      dot.style.cssText = `width:7px;height:7px;border-radius:50%;background:${layer.color}`
+      span.append(dot, document.createTextNode(zh ? layer.nameZh : layer.nameEn))
       labelLayer.appendChild(span)
-      const angle = -0.12 - idx * 0.14 // 赤道下方逐层压低
-      const pos = new Vector3(-Math.cos(angle) * rMid, Math.sin(angle) * rMid, 0)
-      return { span, pos }
+      return span
     })
-
-    let raf = 0
-    const tick = () => {
-      body.rotation.y += 0.0004 // 缓慢旋转，保持剖面长时间可读
-      body.updateMatrixWorld()
-      if (fieldGroupRef.current) fieldGroupRef.current.visible = showFieldRef.current
-      for (const { span, pos } of labelDefs) {
-        const v = pos.clone().applyMatrix4(body.matrixWorld).project(camera)
-        const visible = v.z < 1
-        span.style.display = visible ? 'block' : 'none'
-        if (visible) {
-          span.style.left = `${((v.x + 1) / 2) * el.clientWidth}px`
-          span.style.top = `${((1 - v.y) / 2) * el.clientHeight}px`
-        }
-      }
-      controls.update()
-      renderer.render(scene, camera)
-      raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-
-    const ro = new ResizeObserver(() => {
-      camera.aspect = el.clientWidth / el.clientHeight
-      camera.updateProjectionMatrix()
-      renderer.setSize(el.clientWidth, el.clientHeight)
+    let previousField = showFieldRef.current
+    const frame = () => runtime.setSubject(body, new Sphere(new Vector3(), showFieldRef.current ? (config.fieldType === 'dipole' ? 310 : 112) : R))
+    frame()
+    runtime.start(() => {
+      controls.autoRotate = rotateRef.current
+      fieldGroup.visible = showFieldRef.current
+      if (previousField !== showFieldRef.current) { previousField = showFieldRef.current; frame() }
     })
-    ro.observe(el)
-
     return () => {
-      cancelAnimationFrame(raf)
-      ro.disconnect()
-      renderer.dispose()
-      renderer.forceContextLoss() // 立即释放 WebGL 上下文
-      el.removeChild(renderer.domElement)
-      labelDefs.forEach((l) => l.span.remove())
+      disposed = true
+      disposeModelTree(body, true)
+      runtime.dispose()
+      runtimeRef.current = null
+      labelDefs.forEach(span => span.remove())
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, zh])
 
   return (
     <>
-      <div ref={containerRef} className="absolute inset-0 z-0" />
-      <div ref={labelsRef} className="pointer-events-none absolute inset-0 z-10 overflow-hidden" />
+      <div ref={containerRef} className="model-stage structure-stage" />
+      <div className="model-tools">
+        <button className="space-control" onClick={() => { setRotate(false); runtimeRef.current?.fit() }}>{zh ? '剖面复位' : 'Reset cutaway'}</button>
+        <button className="space-control" aria-pressed={rotate} onClick={() => setRotate(v => !v)}>{zh ? '自转' : 'Rotate'}</button>
+      </div>
+      <div ref={labelsRef} className="model-legend pointer-events-none" />
     </>
   )
 }

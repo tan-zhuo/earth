@@ -18,8 +18,6 @@ export interface CraftModel {
   /** 一行分类标签，用于菜单与切换条 */
   kindZh: string
   kindEn: string
-  /** 相机初始距离（模型坐标单位） */
-  camDist: number
   parts: CraftPart[]
   facts: SpaceFacts
 }
@@ -31,7 +29,6 @@ export const SPACECRAFT_MODELS: CraftModel[] = [
     nameEn: 'Hubble Space Telescope',
     kindZh: '空间望远镜',
     kindEn: 'Space telescope',
-    camDist: 14,
     parts: [
       { id: 'tube', nameZh: '主镜筒（2.4 m 主镜）', nameEn: 'Optical tube (2.4 m mirror)' },
       { id: 'panel', nameZh: '太阳能帆板', nameEn: 'Solar array' },
@@ -62,7 +59,6 @@ export const SPACECRAFT_MODELS: CraftModel[] = [
     nameEn: 'International Space Station',
     kindZh: '空间站',
     kindEn: 'Space station',
-    camDist: 26,
     parts: [
       { id: 'truss', nameZh: '主桁架（109 m）', nameEn: 'Integrated truss (109 m)' },
       { id: 'array', nameZh: '太阳翼（8 片主翼）', nameEn: 'Solar arrays (8 wings)' },
@@ -94,7 +90,6 @@ export const SPACECRAFT_MODELS: CraftModel[] = [
     nameEn: 'Tiangong Space Station',
     kindZh: '空间站',
     kindEn: 'Space station',
-    camDist: 22,
     parts: [
       { id: 'core', nameZh: '天和核心舱', nameEn: 'Tianhe core module' },
       { id: 'wentian', nameZh: '问天实验舱', nameEn: 'Wentian lab module' },
@@ -116,9 +111,9 @@ export const SPACECRAFT_MODELS: CraftModel[] = [
         { labelZh: '乘组', labelEn: 'Crew', valueZh: '3 人长期驻留 · 半年轮换', valueEn: '3 long-duration crew · 6-month rotations' },
       ],
       descZh:
-        '天宫是中国自主建设并运营的近地空间站，采用 T 字构型：天和核心舱居中，负责控制、能源与生活起居；问天、梦天分列两侧，装载科学实验柜并提供出舱气闸。四对柔性太阳翼单翼面积 55 m²，配合霍尔电推进抵消大气阻力、维持轨道高度。后方与径向端口分别停靠神舟载人飞船与天舟货运飞船。巡天空间望远镜计划与空间站共轨飞行，必要时对接维修。',
+        '天宫是中国自主建设并运营的近地空间站，采用 T 字构型：天和核心舱居中，负责控制、能源与生活起居；问天、梦天分列两侧，装载科学实验柜并提供出舱气闸。两艘实验舱各配两翼大型柔性太阳翼，核心舱另配一对太阳翼。神舟可停靠前向或径向端口，天舟停靠后向端口；本模型展示一种简化对接构型。巡天空间望远镜计划与空间站共轨飞行，必要时对接维修。',
       descEn:
-        "China's independently built and operated low-Earth-orbit station, arranged in a T shape: the Tianhe core module handles control, power and living quarters, while Wentian and Mengtian carry science racks and an airlock. Four pairs of flexible solar wings (55 m² each) feed Hall-effect thrusters that counter atmospheric drag. Shenzhou crew ships and Tianzhou freighters dock at the aft and radial ports. The Xuntian space telescope will fly in the same orbit and dock for servicing.",
+        "China's independently built and operated low-Earth-orbit station, arranged in a T shape: the Tianhe core module handles control, power and living quarters, while Wentian and Mengtian carry science racks and an airlock. Each laboratory has two large flexible solar wings, with another pair on the core module. Shenzhou uses forward or radial ports; Tianzhou docks aft. This model shows a simplified docking configuration. The Xuntian space telescope will fly in the same orbit and dock for servicing.",
     },
   },
   {
@@ -127,7 +122,6 @@ export const SPACECRAFT_MODELS: CraftModel[] = [
     nameEn: 'James Webb Space Telescope',
     kindZh: '空间望远镜',
     kindEn: 'Space telescope',
-    camDist: 16,
     parts: [
       { id: 'primary', nameZh: '主镜（18 块镀金铍镜）', nameEn: 'Primary mirror (18 segments)' },
       { id: 'secondary', nameZh: '副镜与三脚支架', nameEn: 'Secondary mirror' },
@@ -158,7 +152,6 @@ export const SPACECRAFT_MODELS: CraftModel[] = [
     nameEn: 'Voyager 1',
     kindZh: '深空探测器',
     kindEn: 'Deep-space probe',
-    camDist: 18,
     parts: [
       { id: 'dish', nameZh: '3.7 m 高增益天线', nameEn: '3.7 m high-gain antenna' },
       { id: 'rtg', nameZh: '同位素温差电源（RTG）', nameEn: 'Radioisotope generators (RTG)' },
@@ -190,7 +183,6 @@ export const SPACECRAFT_MODELS: CraftModel[] = [
     nameEn: 'Apollo Lunar Module',
     kindZh: '载人着陆器',
     kindEn: 'Crewed lander',
-    camDist: 13,
     parts: [
       { id: 'ascent', nameZh: '上升级（乘员舱）', nameEn: 'Ascent stage (crew cabin)' },
       { id: 'descent', nameZh: '下降级（含下降发动机）', nameEn: 'Descent stage' },
