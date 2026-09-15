@@ -6,6 +6,7 @@ import { useAppStore } from '../../store/useAppStore'
 import { SPACECRAFT_MODELS, findCraft } from '../../data/spacecraftModels'
 import { DETAILED_CRAFT, loadDetailedCraft } from './detailedCraft'
 import { buildCraft } from './craftBuilders'
+import { pick, tr } from '../../i18n/pick'
 import { createModelScene, disposeModelTree } from './modelScene'
 
 type Runtime = ReturnType<typeof createModelScene>
@@ -21,7 +22,7 @@ export default function SpacecraftView() {
   const craftId = useAppStore(s => s.craftId)
   const setCraft = useAppStore(s => s.setCraft)
   const { i18n } = useTranslation()
-  const zh = i18n.language.startsWith('zh')
+  const lang = i18n.language
   const craft = findCraft(craftId)
   const [selected, setSelected] = useState<string | null>(null)
   const [rotate, setRotate] = useState(false)
@@ -128,10 +129,10 @@ export default function SpacecraftView() {
   useEffect(() => {
     for (const part of partsRef.current) {
       const definition = craft.parts.find(p => p.id === part.id)!
-      const name = zh ? definition.nameZh : definition.nameEn
+      const name = tr(definition, 'name', lang)
       part.button.title = name; part.button.setAttribute('aria-label', name)
     }
-  }, [craft, zh, detailed])
+  }, [craft, lang, detailed])
 
   useEffect(() => {
     for (const part of partsRef.current) {
@@ -152,36 +153,36 @@ export default function SpacecraftView() {
     partsRef.current.forEach(p => { p.group.visible = true })
     runtimeRef.current?.fit(modelRef.current, view)
   }
-  const name = zh ? craft.nameZh : craft.nameEn
+  const name = tr(craft, 'name', lang)
   return <>
     <div className="model-stage" ref={containerRef} />
     <div className="model-stage pointer-events-none overflow-hidden" ref={labelsRef} />
     {detailed && loadStatus !== 'ready' && <div className="model-stage flex items-center justify-center" role="status">
-      <div className="rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm text-slate-300">{loadStatus === 'loading' ? (zh ? '正在载入精细模型…' : 'Loading detailed model…') : <>{zh ? '模型加载失败' : 'Model could not load'}<button className="space-control" onClick={() => setRetry(v => v + 1)}>{zh ? '重试' : 'Retry'}</button><button className="space-control" onClick={() => setPresentation('parts')}>{zh ? '查看部件结构' : 'View parts'}</button></>}</div>
+      <div className="rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm text-slate-300">{loadStatus === 'loading' ? (pick(lang, '正在载入精细模型…', 'Loading detailed model…', '詳細モデルを読み込み中…', 'Загрузка детальной модели…')) : <>{pick(lang, '模型加载失败', 'Model could not load', 'モデルを読み込めませんでした', 'Не удалось загрузить модель')}<button className="space-control" onClick={() => setRetry(v => v + 1)}>{pick(lang, '重试', 'Retry', '再試行', 'Повторить')}</button><button className="space-control" onClick={() => setPresentation('parts')}>{pick(lang, '查看部件结构', 'View parts', '部品構成を見る', 'Показать детали')}</button></>}</div>
     </div>}
     <div className="model-picker">
-      <label className="sr-only" htmlFor="model-picker">{zh ? '选择航天器' : 'Choose spacecraft'}</label>
+      <label className="sr-only" htmlFor="model-picker">{pick(lang, '选择航天器', 'Choose spacecraft', '宇宙機を選択', 'Выберите аппарат')}</label>
       <select id="model-picker" value={craft.id} onChange={e => setCraft(e.target.value)} className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200">
-        {SPACECRAFT_MODELS.map(c => <option key={c.id} value={c.id}>{zh ? c.nameZh : c.nameEn}</option>)}
+        {SPACECRAFT_MODELS.map(c => <option key={c.id} value={c.id}>{tr(c, 'name', lang)}</option>)}
       </select>
     </div>
-    <div className="model-tools" role="group" aria-label={zh ? '模型工具' : 'Model controls'}>
-      <button className="space-control" onClick={() => reset()}><Icon name="reset" size={15} />{zh ? '复位' : 'Reset'}</button>
-      <button className="space-control" onClick={() => reset(new Vector3(0, 0.001, 1))}><Icon name="front" size={15} />{zh ? '正视' : 'Front'}</button>
-      <button className="space-control" onClick={() => reset(new Vector3(0, 1, 0.001))}><Icon name="top" size={15} />{zh ? '俯视' : 'Top'}</button>
-      <button className="space-control" aria-pressed={rotate} onClick={() => setRotate(v => !v)}><Icon name="rotate" size={15} />{zh ? '自转' : 'Rotate'}</button>
-      <button className="space-control" disabled={detailed} aria-pressed={!detailed && labels} onClick={() => setLabels(v => !v)}><Icon name="pin" size={15} />{zh ? '编号' : 'Pins'}</button>
+    <div className="model-tools" role="group" aria-label={pick(lang, '模型工具', 'Model controls', 'モデル操作', 'Управление моделью')}>
+      <button className="space-control" onClick={() => reset()}><Icon name="reset" size={15} />{pick(lang, '复位', 'Reset', 'リセット', 'Сброс')}</button>
+      <button className="space-control" onClick={() => reset(new Vector3(0, 0.001, 1))}><Icon name="front" size={15} />{pick(lang, '正视', 'Front', '正面', 'Спереди')}</button>
+      <button className="space-control" onClick={() => reset(new Vector3(0, 1, 0.001))}><Icon name="top" size={15} />{pick(lang, '俯视', 'Top', '上から', 'Сверху')}</button>
+      <button className="space-control" aria-pressed={rotate} onClick={() => setRotate(v => !v)}><Icon name="rotate" size={15} />{pick(lang, '自转', 'Rotate', '回転', 'Вращение')}</button>
+      <button className="space-control" disabled={detailed} aria-pressed={!detailed && labels} onClick={() => setLabels(v => !v)}><Icon name="pin" size={15} />{pick(lang, '编号', 'Pins', '番号', 'Номера')}</button>
     </div>
-    <aside className="model-info" aria-label={zh ? '航天器资料' : 'Spacecraft details'}>
+    <aside className="model-info" aria-label={pick(lang, '航天器资料', 'Spacecraft details', '宇宙機の資料', 'Сведения об аппарате')}>
       <div className="shrink-0 border-b border-slate-700/50 p-4">
-        {DETAILED_CRAFT.has(craft.id) && <div className="mb-3 flex gap-1" role="group" aria-label={zh ? '模型展示方式' : 'Model presentation'}>
-          <button className="space-control" aria-pressed={detailed} onClick={() => setPresentation('detail')}>{zh ? '精细外观' : 'Detailed model'}</button>
-          <button className="space-control" aria-pressed={!detailed} onClick={() => setPresentation('parts')}>{zh ? '部件解析' : 'Part explorer'}</button>
+        {DETAILED_CRAFT.has(craft.id) && <div className="mb-3 flex gap-1" role="group" aria-label={pick(lang, '模型展示方式', 'Model presentation', 'モデルの表示方法', 'Режим показа модели')}>
+          <button className="space-control" aria-pressed={detailed} onClick={() => setPresentation('detail')}>{pick(lang, '精细外观', 'Detailed model', '詳細モデル', 'Детальная модель')}</button>
+          <button className="space-control" aria-pressed={!detailed} onClick={() => setPresentation('parts')}>{pick(lang, '部件解析', 'Part explorer', '部品解説', 'Разбор деталей')}</button>
         </div>}
         <h2 className="text-lg font-semibold text-slate-100 md:text-xl">{name}</h2>
-        {!detailed && <div className="mt-2 flex gap-1" role="group" aria-label={zh ? '资料内容' : 'Information'}>
-          <button className="space-control" aria-pressed={tab === 'parts'} onClick={() => setTab('parts')}>{zh ? '部件结构' : 'Parts'}</button>
-          <button className="space-control" aria-pressed={tab === 'facts'} onClick={() => setTab('facts')}>{zh ? '任务资料' : 'Mission'}</button>
+        {!detailed && <div className="mt-2 flex gap-1" role="group" aria-label={pick(lang, '资料内容', 'Information', '資料の内容', 'Сведения')}>
+          <button className="space-control" aria-pressed={tab === 'parts'} onClick={() => setTab('parts')}>{pick(lang, '部件结构', 'Parts', '部品構成', 'Детали')}</button>
+          <button className="space-control" aria-pressed={tab === 'facts'} onClick={() => setTab('facts')}>{pick(lang, '任务资料', 'Mission', 'ミッション資料', 'Миссия')}</button>
         </div>}
       </div>
       <div className="min-h-0 overflow-y-auto overscroll-contain p-3 md:p-4">
@@ -189,21 +190,21 @@ export default function SpacecraftView() {
           <div className="grid grid-cols-2 gap-1.5 md:grid-cols-1">
             {craft.parts.map((p, index) => <button key={p.id} onClick={() => selectPart(selected === p.id ? null : p.id)} aria-pressed={selected === p.id}
               className={`flex min-h-11 items-center gap-2 rounded-lg border px-2 py-2 text-left text-xs leading-relaxed md:text-sm ${selected === p.id ? 'border-sky-400/60 bg-sky-400/10 text-sky-200' : 'border-slate-700/50 text-slate-300 hover:bg-slate-800'}`}>
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[10px] text-sky-300">{index + 1}</span>{zh ? p.nameZh : p.nameEn}
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[10px] text-sky-300">{index + 1}</span>{tr(p, 'name', lang)}
             </button>)}
           </div>
           {selected && <div className="mt-3 flex flex-wrap gap-1">
-            <button className="space-control border border-slate-700" aria-pressed={isolate} onClick={() => setIsolate(v => !v)}>{zh ? '只看该部件' : 'Isolate part'}</button>
-            <button className="space-control border border-slate-700" onClick={() => { setRotate(false); const p = partsRef.current.find(p => p.id === selected); if (p) runtimeRef.current?.fit(p.group) }}>{zh ? '靠近部件' : 'Frame part'}</button>
-            <button className="space-control" onClick={() => { selectPart(null); reset() }}>{zh ? '查看整体' : 'Whole model'}</button>
+            <button className="space-control border border-slate-700" aria-pressed={isolate} onClick={() => setIsolate(v => !v)}>{pick(lang, '只看该部件', 'Isolate part', 'この部品だけ表示', 'Только эта деталь')}</button>
+            <button className="space-control border border-slate-700" onClick={() => { setRotate(false); const p = partsRef.current.find(p => p.id === selected); if (p) runtimeRef.current?.fit(p.group) }}>{pick(lang, '靠近部件', 'Frame part', '部品に寄る', 'Приблизить деталь')}</button>
+            <button className="space-control" onClick={() => { selectPart(null); reset() }}>{pick(lang, '查看整体', 'Whole model', '全体を見る', 'Вся модель')}</button>
           </div>}
-          <p className="mt-4 text-xs leading-relaxed text-slate-400">{zh ? '点击模型或编号选择部件；拖动旋转，滚轮或双指缩放。' : 'Select a part on the model or by number. Drag to orbit; scroll or pinch to zoom.'}</p>
-          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">{zh ? '按主要连接关系重建的简化模型，局部比例有所调整；不是工程装配图或实时对接构型。' : 'A simplified model of the main assemblies, with adjusted local proportions; not an engineering drawing or a live docking configuration.'}</p>
+          <p className="mt-4 text-xs leading-relaxed text-slate-400">{pick(lang, '点击模型或编号选择部件；拖动旋转，滚轮或双指缩放。', 'Select a part on the model or by number. Drag to orbit; scroll or pinch to zoom.', 'モデルか番号をクリックして部品を選択。ドラッグで回転、ホイールまたはピンチでズーム。', 'Выберите деталь на модели или по номеру. Перетаскивайте для вращения, масштаб — колесом или щипком.')}</p>
+          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">{pick(lang, '按主要连接关系重建的简化模型，局部比例有所调整；不是工程装配图或实时对接构型。', 'A simplified model of the main assemblies, with adjusted local proportions; not an engineering drawing or a live docking configuration.', '主要な結合関係に基づいて再構成した簡略モデルで、一部の比率は調整しています。設計図やリアルタイムのドッキング構成ではありません。', 'Упрощённая модель основных узлов с изменёнными местами пропорциями; это не инженерный чертёж и не текущая конфигурация стыковки.')}</p>
         </> : <>
-          {detailed && <p className="mb-4 text-xs leading-6 text-slate-400">{zh ? '拖动查看表面细节，滚轮或双指缩放；切换「部件解析」可单独查看各部件。' : 'Orbit and zoom to inspect surface details. Switch to Part explorer to isolate assemblies.'}<br /><a className="text-sky-300 underline underline-offset-4" href="https://github.com/nasa/NASA-3D-Resources" target="_blank" rel="noopener noreferrer">NASA 3D Resources</a></p>}
-          <p className="mb-3 text-xs text-sky-300">{zh ? craft.facts.subtitleZh : craft.facts.subtitleEn}</p>
-          {craft.facts.rows.map(row => <div key={row.labelEn} className="flex justify-between gap-4 border-b border-slate-800 py-2 text-xs"><span className="shrink-0 text-slate-400">{zh ? row.labelZh : row.labelEn}</span><span className="text-right text-slate-200">{zh ? row.valueZh : row.valueEn}</span></div>)}
-          <p className="mt-4 text-sm leading-7 text-slate-300">{zh ? craft.facts.descZh : craft.facts.descEn}</p>
+          {detailed && <p className="mb-4 text-xs leading-6 text-slate-400">{pick(lang, '拖动查看表面细节，滚轮或双指缩放；切换「部件解析」可单独查看各部件。', 'Orbit and zoom to inspect surface details. Switch to Part explorer to isolate assemblies.', 'ドラッグで表面の細部を確認し、ホイールまたはピンチでズーム。「部品解説」に切り替えると部品ごとに表示できます。', 'Вращайте и масштабируйте, чтобы рассмотреть детали поверхности. В режиме «Разбор деталей» можно смотреть узлы по отдельности.')}<br /><a className="text-sky-300 underline underline-offset-4" href="https://github.com/nasa/NASA-3D-Resources" target="_blank" rel="noopener noreferrer">NASA 3D Resources</a></p>}
+          <p className="mb-3 text-xs text-sky-300">{tr(craft.facts, 'subtitle', lang)}</p>
+          {craft.facts.rows.map(row => <div key={row.labelEn} className="flex justify-between gap-4 border-b border-slate-800 py-2 text-xs"><span className="shrink-0 text-slate-400">{tr(row, 'label', lang)}</span><span className="text-right text-slate-200">{tr(row, 'value', lang)}</span></div>)}
+          <p className="mt-4 text-sm leading-7 text-slate-300">{tr(craft.facts, 'desc', lang)}</p>
         </>}
       </div>
     </aside>

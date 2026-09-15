@@ -20,6 +20,7 @@ import type { Country } from '../types'
 import type { GdpEntry } from '../services/worldbank'
 import { formatUsd } from '../utils/format'
 import { countryName, countryAltName } from '../utils/countryName'
+import { tr } from '../i18n/pick'
 import { PALEO_ERAS } from '../data/paleoEras'
 import { PORTS, ROUTE_LEGS } from '../data/shippingRoutes'
 import type { Port } from '../data/shippingRoutes'
@@ -595,10 +596,9 @@ export default function GlobeView() {
       })
       .pointLabel((d) => {
         const b = d as GdpBar
-        const zh = langRef.current.startsWith('zh')
         return `<div style="font-family:system-ui;padding:6px 10px;background:rgba(2,6,23,.85);
           border:1px solid rgba(56,189,248,.4);border-radius:8px">
-          <div style="font-size:13px;font-weight:600;color:#e2e8f0">${zh ? b.country.nameZh : b.country.nameEn}</div>
+          <div style="font-size:13px;font-weight:600;color:#e2e8f0">${countryName(b.country, langRef.current)}</div>
           <div style="font-size:12px;color:#7dd3fc">GDP: ${formatUsd(b.gdp, langRef.current)} (${b.gdpYear})</div>
         </div>`
       })
@@ -617,7 +617,6 @@ export default function GlobeView() {
       markers.push(...countries.map((c) => ({ kind: 'flag' as const, country: c })))
     if (!timeTravel && showRoutes)
       markers.push(...PORTS.map((p) => ({ kind: 'port' as const, port: p })))
-    const zh = langRef.current.startsWith('zh')
     world
       .htmlElementsData(markers as unknown as object[])
       .htmlLat((d) => {
@@ -661,7 +660,7 @@ export default function GlobeView() {
           <span style="width:6px;height:6px;border-radius:50%;background:#38bdf8;box-shadow:0 0 6px #38bdf8"></span>
           <span style="margin-top:2px;font-size:10px;font-family:system-ui;color:#bae6fd;
             text-shadow:0 0 4px rgba(2,6,23,.9),0 0 2px rgba(2,6,23,.9);white-space:nowrap">
-            ${zh ? m.port.nameZh : m.port.nameEn}</span>`
+            ${tr(m.port, 'name', langRef.current)}</span>`
         return el
       })
     world.htmlElementVisibilityModifier((element, visible) => {
@@ -897,7 +896,7 @@ export default function GlobeView() {
 
       // 每个星座一个标签，跟随首颗卫星
       const span = document.createElement('span')
-      span.textContent = langRef.current.startsWith('zh') ? s.nameZh : s.nameEn
+      span.textContent = tr(s, 'name', langRef.current)
       span.style.cssText =
         `position:absolute;transform:translate(-50%,-160%);font-size:10px;font-family:system-ui;color:${s.color};` +
         'text-shadow:0 0 4px rgba(2,6,23,.95);pointer-events:none;white-space:nowrap'

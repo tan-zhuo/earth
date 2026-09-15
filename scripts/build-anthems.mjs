@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 
 const OUT = resolve(dirname(fileURLToPath(import.meta.url)), '../src/data/anthems.json')
 
-const QUERY = `SELECT ?iso3 ?anthemEn ?anthemZh ?anthemZhCn ?audio WHERE {
+const QUERY = `SELECT ?iso3 ?anthemEn ?anthemZh ?anthemZhCn ?anthemJa ?anthemRu ?audio WHERE {
   ?country wdt:P298 ?iso3 .
   ?country p:P85 ?st .
   ?st ps:P85 ?anthem .
@@ -20,6 +20,8 @@ const QUERY = `SELECT ?iso3 ?anthemEn ?anthemZh ?anthemZhCn ?audio WHERE {
   OPTIONAL { ?anthem rdfs:label ?anthemEn FILTER(LANG(?anthemEn)="en") }
   OPTIONAL { ?anthem rdfs:label ?anthemZh FILTER(LANG(?anthemZh)="zh") }
   OPTIONAL { ?anthem rdfs:label ?anthemZhCn FILTER(LANG(?anthemZhCn)="zh-cn") }
+  OPTIONAL { ?anthem rdfs:label ?anthemJa FILTER(LANG(?anthemJa)="ja") }
+  OPTIONAL { ?anthem rdfs:label ?anthemRu FILTER(LANG(?anthemRu)="ru") }
 }`
 
 const res = await fetch('https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(QUERY), {
@@ -36,6 +38,8 @@ for (const row of json.results.bindings) {
     nameEn: row.anthemEn?.value ?? null,
     // 优先简体中文标签
     nameZh: row.anthemZhCn?.value ?? row.anthemZh?.value ?? null,
+    nameJa: row.anthemJa?.value ?? null,
+    nameRu: row.anthemRu?.value ?? null,
     // Commons 文件 URL 转 https
     audio: row.audio?.value?.replace(/^http:/, 'https:') ?? null,
   }

@@ -177,10 +177,18 @@
       </div>
       <div class="splash-title">
         Earth
-        <small>正在加载地球 · Loading Earth…</small>
+        <small id="splash-text">正在加载地球 · Loading Earth…</small>
       </div>
       <div class="splash-bar"></div>
     </div>
+    <script>
+      // 启动页文案跟随已保存的界面语言（与 i18n 的 earth:lang 一致），否则按浏览器语言
+      try {
+        var lang = localStorage.getItem('earth:lang') || navigator.language || ''
+        var text = { zh: '正在加载地球…', en: 'Loading Earth…', ja: '地球を読み込み中…', ru: 'Загрузка Земли…' }[lang.slice(0, 2)]
+        if (text) document.getElementById('splash-text').textContent = text
+      } catch (e) {}
+    </script>
     <script>
       // 兜底：应用异常时 12 秒后自动淡出启动页，不永久遮挡
       setTimeout(function () {

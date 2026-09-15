@@ -8,6 +8,7 @@ import {
 import { createModelScene, disposeModelTree } from './modelScene'
 import { useTranslation } from 'react-i18next'
 import type { StructureConfig } from '../../data/structures'
+import { pick, tr } from '../../i18n/pick'
 
 const R = 100 // 表面半径
 const PHI_LEN = Math.PI * 1.5 // 球壳保留 270°，切出 90° 剖面楔口
@@ -26,7 +27,7 @@ export default function StructureScene({
   const containerRef = useRef<HTMLDivElement>(null)
   const labelsRef = useRef<HTMLDivElement>(null)
   const { i18n } = useTranslation()
-  const zh = i18n.language.startsWith('zh')
+  const lang = i18n.language
   const showFieldRef = useRef(showField)
   showFieldRef.current = showField
   const runtimeRef = useRef<ReturnType<typeof createModelScene> | null>(null)
@@ -155,7 +156,7 @@ export default function StructureScene({
       span.style.cssText = 'display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#e2e8f0;padding:3px 6px;background:#020617bb;border-radius:4px'
       const dot = document.createElement('i')
       dot.style.cssText = `width:7px;height:7px;border-radius:50%;background:${layer.color}`
-      span.append(dot, document.createTextNode(zh ? layer.nameZh : layer.nameEn))
+      span.append(dot, document.createTextNode(tr(layer, 'name', lang)))
       labelLayer.appendChild(span)
       return span
     })
@@ -175,14 +176,14 @@ export default function StructureScene({
       labelDefs.forEach(span => span.remove())
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config, zh])
+  }, [config, lang])
 
   return (
     <>
       <div ref={containerRef} className="model-stage structure-stage" />
       <div className="model-tools">
-        <button className="space-control" onClick={() => { setRotate(false); runtimeRef.current?.fit() }}>{zh ? '剖面复位' : 'Reset cutaway'}</button>
-        <button className="space-control" aria-pressed={rotate} onClick={() => setRotate(v => !v)}>{zh ? '自转' : 'Rotate'}</button>
+        <button className="space-control" onClick={() => { setRotate(false); runtimeRef.current?.fit() }}>{pick(lang, '剖面复位', 'Reset cutaway', '断面をリセット', 'Сбросить разрез')}</button>
+        <button className="space-control" aria-pressed={rotate} onClick={() => setRotate(v => !v)}>{pick(lang, '自转', 'Rotate', '回転', 'Вращение')}</button>
       </div>
       <div ref={labelsRef} className="model-legend pointer-events-none" />
     </>

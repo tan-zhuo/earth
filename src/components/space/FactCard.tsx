@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { SpaceFacts } from '../../data/space'
+import { tr } from '../../i18n/pick'
 
 /** 宇宙视图共用的右侧资料卡（月球/行星/银河系/宇宙），可关闭，关闭后显示 ⓘ 重开按钮 */
 export default function FactCard({ facts, modelLayout = false }: { facts: SpaceFacts; modelLayout?: boolean }) {
   const { i18n } = useTranslation()
-  const zh = i18n.language.startsWith('zh')
+  const lang = i18n.language
   const [open, setOpen] = useState(true)
 
   // 内容变化（如点击了另一颗行星）时重新展开
@@ -41,23 +42,23 @@ export default function FactCard({ facts, modelLayout = false }: { facts: SpaceF
             <path d="M3 3l10 10M13 3L3 13" />
           </svg>
         </button>
-        <h2 className="text-2xl font-bold text-slate-100">{zh ? facts.titleZh : facts.titleEn}</h2>
-        <p className="mt-1 text-xs text-sky-400">{zh ? facts.subtitleZh : facts.subtitleEn}</p>
+        <h2 className="text-2xl font-bold text-slate-100">{tr(facts, 'title', lang)}</h2>
+        <p className="mt-1 text-xs text-sky-400">{tr(facts, 'subtitle', lang)}</p>
 
         <div className="mt-4 space-y-0.5">
           {facts.rows.map((r) => (
             <div key={r.labelEn} className="flex items-baseline justify-between gap-4 py-1.5 text-sm">
-              <span className="shrink-0 text-slate-400">{zh ? r.labelZh : r.labelEn}</span>
-              <span className="text-right font-medium text-slate-200">{zh ? r.valueZh : r.valueEn}</span>
+              <span className="shrink-0 text-slate-400">{tr(r, 'label', lang)}</span>
+              <span className="text-right font-medium text-slate-200">{tr(r, 'value', lang)}</span>
             </div>
           ))}
         </div>
 
         <p className="mt-4 border-t border-slate-700/40 pt-3 text-sm leading-relaxed text-slate-300">
-          {zh ? facts.descZh : facts.descEn}
+          {tr(facts, 'desc', lang)}
         </p>
         {(facts.noteZh || facts.noteEn) && (
-          <p className="mt-3 text-[10px] text-slate-600">{zh ? facts.noteZh : facts.noteEn}</p>
+          <p className="mt-3 text-[10px] text-slate-600">{tr(facts, 'note', lang)}</p>
         )}
       </div>
     </aside>

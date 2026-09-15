@@ -4,6 +4,7 @@ import { useAppStore } from '../store/useAppStore'
 import { OIL_PRODUCTION, GAS_PRODUCTION } from '../data/resources'
 import { formatUsd } from '../utils/format'
 import { countryName } from '../utils/countryName'
+import { pick } from '../i18n/pick'
 import type { Country } from '../types'
 
 type TabKey = 'gdp' | 'exports' | 'imports' | 'oil' | 'gas'
@@ -27,7 +28,6 @@ export default function RankingPanel() {
   const [tab, setTab] = useState<TabKey>('gdp')
 
   const lang = i18n.language
-  const zh = lang.startsWith('zh')
 
   const byCca3 = useMemo(() => new Map(countries.map((c) => [c.cca3, c])), [countries])
 
@@ -43,12 +43,20 @@ export default function RankingPanel() {
           value: entry.value,
           display:
             tab === 'oil'
-              ? zh
-                ? `${(entry.value / 10).toLocaleString('zh-CN')} 万桶/日`
-                : `${entry.value.toLocaleString('en-US')} kb/d`
-              : zh
-                ? `${(entry.value * 10).toLocaleString('zh-CN')} 亿立方米/年`
-                : `${entry.value.toLocaleString('en-US')} bcm/yr`,
+              ? pick(
+                  lang,
+                  `${(entry.value / 10).toLocaleString('zh-CN')} 万桶/日`,
+                  `${entry.value.toLocaleString('en-US')} kb/d`,
+                  `${(entry.value / 10).toLocaleString('ja-JP')} 万バレル/日`,
+                  `${entry.value.toLocaleString('ru-RU')} тыс. барр./сут`,
+                )
+              : pick(
+                  lang,
+                  `${(entry.value * 10).toLocaleString('zh-CN')} 亿立方米/年`,
+                  `${entry.value.toLocaleString('en-US')} bcm/yr`,
+                  `${(entry.value * 10).toLocaleString('ja-JP')} 億立方メートル/年`,
+                  `${entry.value.toLocaleString('ru-RU')} млрд м³/год`,
+                ),
         }))
     }
     // World Bank 榜（GDP / 出口 / 进口）
@@ -62,7 +70,7 @@ export default function RankingPanel() {
       .filter((x): x is RankRow => x !== null)
       .sort((a, b) => b.value - a.value)
       .slice(0, TOP_N)
-  }, [tab, gdpAll, countries, byCca3, zh, lang])
+  }, [tab, gdpAll, countries, byCca3, lang])
 
   if (!showRankings) return null
 

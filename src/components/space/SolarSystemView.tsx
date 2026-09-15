@@ -11,6 +11,7 @@ import { DEEP_SPACE_PROBES } from '../../data/spacecraft'
 import SpaceExplorer, { useExplorer } from './SpaceExplorer'
 import { SOLAR_ITEMS, SOLAR_LAYERS } from '../../data/spaceExplore'
 import { createSpaceScene, createSpaceLabels, seededRandom } from './spaceScene'
+import { pick, tr } from '../../i18n/pick'
 
 /** 生成太阳光晕贴图（径向渐变，避免外部资源） */
 function makeGlowTexture(): CanvasTexture {
@@ -31,7 +32,7 @@ export default function SolarSystemView() {
   const containerRef = useRef<HTMLDivElement>(null)
   const labelsRef = useRef<HTMLDivElement>(null)
   const { i18n } = useTranslation()
-  const zh = i18n.language.startsWith('zh')
+  const lang = i18n.language
   const explorer = useExplorer(SOLAR_LAYERS)
   const { live } = explorer
 
@@ -162,10 +163,10 @@ export default function SolarSystemView() {
       })
     }
 
-    labels.add('sun', zh ? '太阳' : 'Sun', '#fbbf24', () => new Vector3())
+    labels.add('sun', pick(lang, '太阳', 'Sun', '太陽', 'Солнце'), '#fbbf24', () => new Vector3())
     for (const p of PLANETS) {
       const planet = planetMeshes.find(pm => pm.id === p.id)!
-      labels.add(p.id, zh ? p.nameZh : p.nameEn, '#93c5fd', () => planet.mesh.getWorldPosition(new Vector3()))
+      labels.add(p.id, tr(p, 'name', lang), '#93c5fd', () => planet.mesh.getWorldPosition(new Vector3()))
     }
     // Thin belts give the scene a readable transition from inner rocky worlds to its icy outskirts.
     for (const belt of [{ id: 'asteroids', inner: 80, outer: 90, color: '#b9aa93', count: 1600 }, { id: 'kuiper', inner: 207, outer: 236, color: '#8998cf', count: 2600 }]) {
@@ -176,14 +177,16 @@ export default function SolarSystemView() {
       }
       const points = new Points(new BufferGeometry().setAttribute('position', new Float32BufferAttribute(positions, 3)), new PointsMaterial({ color: belt.color, size: 0.55, transparent: true, opacity: 0.6, depthWrite: false }))
       beltGroup.add(points)
-      labels.add(belt.id, zh ? (belt.id === 'asteroids' ? '小行星带' : '柯伊伯带') : (belt.id === 'asteroids' ? 'Asteroid belt' : 'Kuiper belt'), belt.color,
+      labels.add(belt.id, belt.id === 'asteroids'
+        ? pick(lang, '小行星带', 'Asteroid belt', '小惑星帯', 'Пояс астероидов')
+        : pick(lang, '柯伊伯带', 'Kuiper belt', 'カイパーベルト', 'Пояс Койпера'), belt.color,
         () => new Vector3(-belt.inner * 0.8, 0, belt.inner * 0.6), 'belts')
     }
 
     // 日地拉格朗日点 L1–L5（L1/L2 离地球仅 0.01 AU，展示距离经夸大）
     const lagrangeDefs = [
       { id: 'l1', text: 'L1' },
-      { id: 'l2', text: zh ? 'L2 · 韦布望远镜' : 'L2 · JWST' },
+      { id: 'l2', text: pick(lang, 'L2 · 韦布望远镜', 'L2 · JWST', 'L2 · ウェッブ望遠鏡', 'L2 · «Уэбб»') },
       { id: 'l3', text: 'L3' },
       { id: 'l4', text: 'L4' },
       { id: 'l5', text: 'L5' },
@@ -211,7 +214,7 @@ export default function SolarSystemView() {
       probeGroup.add(
         new Line(trackGeo, new LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.3 })),
       )
-      labels.add(probe.id, zh ? probe.nameZh : probe.nameEn, '#cbd5e1', () => pos.clone(), 'probes')
+      labels.add(probe.id, tr(probe, 'name', lang), '#cbd5e1', () => pos.clone(), 'probes')
     }
 
     /** 按地球当前轨道角更新 L1–L5 位置 */
@@ -299,13 +302,18 @@ export default function SolarSystemView() {
       labels.dispose(); runtime.dispose()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zh])
+  }, [lang])
 
   return (
     <>
       <div ref={containerRef} className="space-stage" />
       <div ref={labelsRef} className="space-stage pointer-events-none overflow-hidden" />
-      <SpaceExplorer kind="solar" explorer={explorer} items={SOLAR_ITEMS} layers={SOLAR_LAYERS} note={[SOLAR_NOTE[0] + ' 公转速度为演示速度，非实时星历。', SOLAR_NOTE[1] + ' Orbital motion is illustrative, not a live ephemeris.']} />
+      <SpaceExplorer kind="solar" explorer={explorer} items={SOLAR_ITEMS} layers={SOLAR_LAYERS} note={[
+        SOLAR_NOTE[0] + ' 公转速度为演示速度，非实时星历。',
+        SOLAR_NOTE[1] + ' Orbital motion is illustrative, not a live ephemeris.',
+        SOLAR_NOTE[2] + ' 公転の速さは説明用で、リアルタイムの天体暦ではありません。',
+        SOLAR_NOTE[3] + ' Движение по орбитам условное, это не эфемериды в реальном времени.',
+      ]} />
     </>
   )
 }

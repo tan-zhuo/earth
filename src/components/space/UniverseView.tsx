@@ -8,6 +8,7 @@ import { makeStarTexture, makeGlowTexture, makeSpiralTexture } from '../../utils
 import SpaceExplorer, { useExplorer } from './SpaceExplorer'
 import { UNIVERSE_ITEMS, UNIVERSE_LAYERS, UNIVERSE_POSITIONS } from '../../data/spaceExplore'
 import { createSpaceScene, createSpaceLabels, seededRandom } from './spaceScene'
+import { tr } from '../../i18n/pick'
 
 const CLUSTERS = 130
 const R = 95
@@ -17,7 +18,7 @@ export default function UniverseView() {
   const containerRef = useRef<HTMLDivElement>(null)
   const labelsRef = useRef<HTMLDivElement>(null)
   const { i18n } = useTranslation()
-  const zh = i18n.language.startsWith('zh')
+  const lang = i18n.language
   const explorer = useExplorer(UNIVERSE_LAYERS)
   const { live } = explorer
 
@@ -182,7 +183,7 @@ export default function UniverseView() {
     web.add(voidOutline)
     for (const item of UNIVERSE_ITEMS.slice(1)) {
       const layer = item.id === 'cluster' ? 'clusters' : item.id === 'filament' ? 'filaments' : item.id === 'void' ? 'voids' : undefined
-      labels.add(item.id, zh ? item.nameZh : item.nameEn, item.color,
+      labels.add(item.id, tr(item, 'name', lang), item.color,
         () => new Vector3(...UNIVERSE_POSITIONS[item.id]).applyMatrix4(web.matrixWorld), layer)
     }
     runtime.setFocusProvider(id => UNIVERSE_POSITIONS[id] ? {
@@ -197,14 +198,19 @@ export default function UniverseView() {
     }, () => labels.update(live.current))
     return () => { labels.dispose(); runtime.dispose() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zh])
+  }, [lang])
 
   return (
     <>
       <div ref={containerRef} className="space-stage" />
       <div ref={labelsRef} className="space-stage pointer-events-none overflow-hidden" />
       <SpaceExplorer kind="universe" explorer={explorer} items={UNIVERSE_ITEMS} layers={UNIVERSE_LAYERS}
-        note={['宇宙网为结构示意，非巡天地图；近邻星系被放大，地标不使用真实坐标。', 'A schematic cosmic web, not a survey map. Nearby galaxies are enlarged; landmarks are not at measured coordinates.']} />
+        note={[
+          '宇宙网为结构示意，非巡天地图；近邻星系被放大，地标不使用真实坐标。',
+          'A schematic cosmic web, not a survey map. Nearby galaxies are enlarged; landmarks are not at measured coordinates.',
+          '宇宙の網は構造のイメージであり、観測に基づく地図ではありません。近くの銀河は拡大して表示しており、目印は実際の座標ではありません。',
+          'Схема космической паутины, а не карта обзора неба. Ближайшие галактики увеличены; метки не соответствуют измеренным координатам.',
+        ]} />
     </>
   )
 }

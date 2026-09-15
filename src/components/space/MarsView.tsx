@@ -9,6 +9,7 @@ import {
 } from '../../data/structures'
 import type { MarsSite } from '../../data/structures'
 import { useAppStore } from '../../store/useAppStore'
+import { tr } from '../../i18n/pick'
 
 type Mode = 'surface' | 'structure' | 'magnetic'
 
@@ -55,7 +56,7 @@ function MarsSurface() {
   useEffect(() => {
     const world = globeRef.current
     if (!world) return
-    const zh = i18n.language.startsWith('zh')
+    const lang = i18n.language
     world
       .htmlElementsData(MARS_SITES as unknown as object[])
       .htmlLat((d) => (d as MarsSite).lat)
@@ -68,7 +69,7 @@ function MarsSurface() {
         div.innerHTML = `
           <span style="width:7px;height:7px;border-radius:50%;background:#4ade80;box-shadow:0 0 8px #4ade80"></span>
           <span style="margin-top:2px;font-size:10px;font-family:system-ui;color:#bbf7d0;white-space:nowrap;
-            text-shadow:0 0 4px rgba(2,6,23,.95)">${zh ? s.nameZh : s.nameEn} · ${s.yearLabel}</span>`
+            text-shadow:0 0 4px rgba(2,6,23,.95)">${tr(s, 'name', lang)} · ${s.yearLabel}</span>`
         return div
       })
   }, [i18n.language])

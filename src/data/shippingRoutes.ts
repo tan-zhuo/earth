@@ -6,31 +6,33 @@
 export interface Port {
   id: string
   nameZh: string
+  nameJa: string
+  nameRu: string
   nameEn: string
   lat: number
   lng: number
 }
 
 export const PORTS: Port[] = [
-  { id: 'shanghai', nameZh: '上海', nameEn: 'Shanghai', lat: 31.2, lng: 121.5 },
-  { id: 'singapore', nameZh: '新加坡', nameEn: 'Singapore', lat: 1.29, lng: 103.85 },
-  { id: 'busan', nameZh: '釜山', nameEn: 'Busan', lat: 35.1, lng: 129.0 },
-  { id: 'tokyo', nameZh: '东京', nameEn: 'Tokyo', lat: 35.6, lng: 139.7 },
-  { id: 'colombo', nameZh: '科伦坡', nameEn: 'Colombo', lat: 6.95, lng: 79.85 },
-  { id: 'dubai', nameZh: '迪拜', nameEn: 'Dubai', lat: 25.0, lng: 55.06 },
-  { id: 'suez', nameZh: '苏伊士', nameEn: 'Suez', lat: 29.97, lng: 32.55 },
-  { id: 'piraeus', nameZh: '比雷埃夫斯', nameEn: 'Piraeus', lat: 37.94, lng: 23.64 },
-  { id: 'algeciras', nameZh: '直布罗陀', nameEn: 'Gibraltar', lat: 36.13, lng: -5.45 },
-  { id: 'rotterdam', nameZh: '鹿特丹', nameEn: 'Rotterdam', lat: 51.95, lng: 4.14 },
-  { id: 'newyork', nameZh: '纽约', nameEn: 'New York', lat: 40.67, lng: -74.04 },
-  { id: 'losangeles', nameZh: '洛杉矶', nameEn: 'Los Angeles', lat: 33.73, lng: -118.26 },
-  { id: 'panama', nameZh: '巴拿马', nameEn: 'Panama', lat: 9.35, lng: -79.9 },
-  { id: 'santos', nameZh: '桑托斯', nameEn: 'Santos', lat: -23.98, lng: -46.3 },
-  { id: 'capetown', nameZh: '开普敦', nameEn: 'Cape Town', lat: -33.9, lng: 18.42 },
-  { id: 'lagos', nameZh: '拉各斯', nameEn: 'Lagos', lat: 6.44, lng: 3.4 },
-  { id: 'mumbai', nameZh: '孟买', nameEn: 'Mumbai', lat: 18.95, lng: 72.84 },
-  { id: 'sydney', nameZh: '悉尼', nameEn: 'Sydney', lat: -33.85, lng: 151.2 },
-  { id: 'vancouver', nameZh: '温哥华', nameEn: 'Vancouver', lat: 49.29, lng: -123.11 },
+  { id: 'shanghai', nameZh: '上海', nameEn: 'Shanghai', nameJa: '上海', nameRu: 'Шанхай', lat: 31.2, lng: 121.5 },
+  { id: 'singapore', nameZh: '新加坡', nameEn: 'Singapore', nameJa: 'シンガポール', nameRu: 'Сингапур', lat: 1.29, lng: 103.85 },
+  { id: 'busan', nameZh: '釜山', nameEn: 'Busan', nameJa: '釜山', nameRu: 'Пусан', lat: 35.1, lng: 129.0 },
+  { id: 'tokyo', nameZh: '东京', nameEn: 'Tokyo', nameJa: '東京', nameRu: 'Токио', lat: 35.6, lng: 139.7 },
+  { id: 'colombo', nameZh: '科伦坡', nameEn: 'Colombo', nameJa: 'コロンボ', nameRu: 'Коломбо', lat: 6.95, lng: 79.85 },
+  { id: 'dubai', nameZh: '迪拜', nameEn: 'Dubai', nameJa: 'ドバイ', nameRu: 'Дубай', lat: 25.0, lng: 55.06 },
+  { id: 'suez', nameZh: '苏伊士', nameEn: 'Suez', nameJa: 'スエズ', nameRu: 'Суэц', lat: 29.97, lng: 32.55 },
+  { id: 'piraeus', nameZh: '比雷埃夫斯', nameEn: 'Piraeus', nameJa: 'ピレウス', nameRu: 'Пирей', lat: 37.94, lng: 23.64 },
+  { id: 'algeciras', nameZh: '直布罗陀', nameEn: 'Gibraltar', nameJa: 'ジブラルタル', nameRu: 'Гибралтар', lat: 36.13, lng: -5.45 },
+  { id: 'rotterdam', nameZh: '鹿特丹', nameEn: 'Rotterdam', nameJa: 'ロッテルダム', nameRu: 'Роттердам', lat: 51.95, lng: 4.14 },
+  { id: 'newyork', nameZh: '纽约', nameEn: 'New York', nameJa: 'ニューヨーク', nameRu: 'Нью-Йорк', lat: 40.67, lng: -74.04 },
+  { id: 'losangeles', nameZh: '洛杉矶', nameEn: 'Los Angeles', nameJa: 'ロサンゼルス', nameRu: 'Лос-Анджелес', lat: 33.73, lng: -118.26 },
+  { id: 'panama', nameZh: '巴拿马', nameEn: 'Panama', nameJa: 'パナマ', nameRu: 'Панама', lat: 9.35, lng: -79.9 },
+  { id: 'santos', nameZh: '桑托斯', nameEn: 'Santos', nameJa: 'サントス', nameRu: 'Сантус', lat: -23.98, lng: -46.3 },
+  { id: 'capetown', nameZh: '开普敦', nameEn: 'Cape Town', nameJa: 'ケープタウン', nameRu: 'Кейптаун', lat: -33.9, lng: 18.42 },
+  { id: 'lagos', nameZh: '拉各斯', nameEn: 'Lagos', nameJa: 'ラゴス', nameRu: 'Лагос', lat: 6.44, lng: 3.4 },
+  { id: 'mumbai', nameZh: '孟买', nameEn: 'Mumbai', nameJa: 'ムンバイ', nameRu: 'Мумбаи', lat: 18.95, lng: 72.84 },
+  { id: 'sydney', nameZh: '悉尼', nameEn: 'Sydney', nameJa: 'シドニー', nameRu: 'Сидней', lat: -33.85, lng: 151.2 },
+  { id: 'vancouver', nameZh: '温哥华', nameEn: 'Vancouver', nameJa: 'バンクーバー', nameRu: 'Ванкувер', lat: 49.29, lng: -123.11 },
 ]
 
 export interface RouteLeg {

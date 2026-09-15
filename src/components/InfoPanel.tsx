@@ -10,13 +10,18 @@ import type { WikiSummary } from '../services/wikipedia'
 import { countryExtras } from '../data/countryExtras'
 import factbookRaw from '../data/factbook.json'
 import anthemsRaw from '../data/anthems.json'
+import capitalNamesRaw from '../data/capitalNames.json'
 import { translateTerms } from '../utils/termsZh'
+import { langOf, pick, tr } from '../i18n/pick'
 
 /** 各国国歌（构建时由 Wikidata 生成，音频托管于 Wikimedia Commons） */
 const anthems = anthemsRaw as Record<
   string,
-  { nameEn: string | null; nameZh: string | null; audio: string | null }
+  { nameEn: string | null; nameZh: string | null; nameJa?: string | null; nameRu?: string | null; audio: string | null }
 >
+
+/** 首都中/日/俄译名（Wikidata P36 标签；多首都国家不收录，回退英文） */
+const capitalNames = capitalNamesRaw as Record<string, { zh: string | null; ja: string | null; ru: string | null }>
 
 /** CIA Factbook 精选字段（构建时生成，见 scripts/build-factbook.mjs） */
 const factbook = factbookRaw as Record<
@@ -28,14 +33,43 @@ import type { WbStats } from '../types'
 import { formatBigNumber, formatUsd, formatExact } from '../utils/format'
 import { countryName, countryAltName, countryOfficialName } from '../utils/countryName'
 
-/** 大洲名称中译（数据集的 region 只有英文） */
-const regionZh: Record<string, string> = {
-  Africa: '非洲',
-  Americas: '美洲',
-  Asia: '亚洲',
-  Europe: '欧洲',
-  Oceania: '大洋洲',
-  Antarctic: '南极洲',
+/** 大洲 / 次区域名称译名（数据集的 region、subregion 只有英文），顺序：中、日、俄 */
+const regionNames: Record<string, [string, string, string]> = {
+  Africa: ['非洲', 'アフリカ', 'Африка'],
+  Americas: ['美洲', 'アメリカ大陸', 'Америка'],
+  Asia: ['亚洲', 'アジア', 'Азия'],
+  Europe: ['欧洲', 'ヨーロッパ', 'Европа'],
+  Oceania: ['大洋洲', 'オセアニア', 'Океания'],
+  Antarctic: ['南极洲', '南極', 'Антарктика'],
+  Caribbean: ['加勒比地区', 'カリブ海地域', 'Карибский бассейн'],
+  'Southern Asia': ['南亚', '南アジア', 'Южная Азия'],
+  'Middle Africa': ['中部非洲', '中部アフリカ', 'Центральная Африка'],
+  'Northern Europe': ['北欧', '北ヨーロッパ', 'Северная Европа'],
+  'Southeast Europe': ['东南欧', '東南ヨーロッパ', 'Юго-Восточная Европа'],
+  'Southern Europe': ['南欧', '南ヨーロッパ', 'Южная Европа'],
+  'Western Asia': ['西亚', '西アジア', 'Западная Азия'],
+  'South America': ['南美洲', '南アメリカ', 'Южная Америка'],
+  Polynesia: ['波利尼西亚', 'ポリネシア', 'Полинезия'],
+  'Australia and New Zealand': ['澳大利亚和新西兰', 'オーストラリア・ニュージーランド', 'Австралия и Новая Зеландия'],
+  'Central Europe': ['中欧', '中央ヨーロッパ', 'Центральная Европа'],
+  'Eastern Africa': ['东部非洲', '東アフリカ', 'Восточная Африка'],
+  'Western Europe': ['西欧', '西ヨーロッパ', 'Западная Европа'],
+  'Western Africa': ['西部非洲', '西アフリカ', 'Западная Африка'],
+  'Eastern Europe': ['东欧', '東ヨーロッパ', 'Восточная Европа'],
+  'Central America': ['中美洲', '中央アメリカ', 'Центральная Америка'],
+  'North America': ['北美洲', '北アメリカ', 'Северная Америка'],
+  'South-Eastern Asia': ['东南亚', '東南アジア', 'Юго-Восточная Азия'],
+  'Southern Africa': ['南部非洲', '南部アフリカ', 'Южная Африка'],
+  'Eastern Asia': ['东亚', '東アジア', 'Восточная Азия'],
+  'Northern Africa': ['北部非洲', '北アフリカ', 'Северная Африка'],
+  Melanesia: ['美拉尼西亚', 'メラネシア', 'Меланезия'],
+  Micronesia: ['密克罗尼西亚', 'ミクロネシア', 'Микронезия'],
+  'Central Asia': ['中亚', '中央アジア', 'Центральная Азия'],
+}
+
+function regionName(name: string, lang: string): string {
+  const names = regionNames[name]
+  return names ? pick(lang, names[0], name, names[1], names[2]) : name
 }
 
 const incomeBadgeColor: Record<string, string> = {
@@ -136,15 +170,20 @@ export default function InfoPanel() {
   if (!selected) return null
 
   const lang = i18n.language
-  const zh = lang.startsWith('zh')
+  const uiLang = langOf(lang)
   const extra = countryExtras[selected.cca3]
 
   const name = countryName(selected, lang)
   const altName = countryAltName(selected, lang)
   const official = countryOfficialName(selected, lang)
-  const capital = zh && extra?.capitalZh ? extra.capitalZh : selected.capital.join(', ') || '—'
-  const region = zh ? (regionZh[selected.region] ?? selected.region) : selected.region
-  const government = extra ? (zh ? extra.govZh : extra.govEn) : null
+  const capitalEn = selected.capital.join(', ') || '—'
+  const capital =
+    uiLang === 'en'
+      ? capitalEn
+      : (extra ? tr(extra, 'capital', lang) : undefined) ?? capitalNames[selected.cca3]?.[uiLang] ?? capitalEn
+  const region = regionName(selected.region, lang)
+  const subregion = selected.subregion ? regionName(selected.subregion, lang) : ''
+  const government = extra ? tr(extra, 'gov', lang) : null
   const income = stats?.gdpPerCapita != null ? incomeGroupOf(stats.gdpPerCapita) : null
 
   // 全球 GDP 排名与进出口（批量数据含世界/地区等聚合体，排名只与真实国家比较）
@@ -162,7 +201,7 @@ export default function InfoPanel() {
 
   // Factbook 清单（中文按术语词典翻译）
   const fb = factbook[selected.cca3]
-  const fbText = (s: string | null | undefined) => (s ? (zh ? translateTerms(s) : s) : null)
+  const fbText = (s: string | null | undefined) => (s ? translateTerms(s, lang) : null)
   const fbRes = fbText(fb?.res)
   const fbAgri = fbText(fb?.agri)
   const fbInd = fbText(fb?.ind)
@@ -258,7 +297,7 @@ export default function InfoPanel() {
           <Row label={t('panel.capital')} value={capital} />
           <Row
             label={t('panel.region')}
-            value={`${region}${selected.subregion ? ` · ${selected.subregion}` : ''}`}
+            value={`${region}${subregion ? ` · ${subregion}` : ''}`}
           />
           <Row
             label={t('panel.area')}
@@ -394,11 +433,13 @@ export default function InfoPanel() {
           {resStats?.freshwater != null && resStats.freshwater > 0 && (
             <Row
               label={t('panel.freshwater')}
-              value={
-                zh
-                  ? `${formatBigNumber(resStats.freshwater * 10, lang)} 亿立方米`
-                  : `${resStats.freshwater.toLocaleString('en-US', { maximumFractionDigits: 0 })} km³`
-              }
+              value={pick(
+                lang,
+                `${formatBigNumber(resStats.freshwater * 10, lang)} 亿立方米`,
+                `${resStats.freshwater.toLocaleString('en-US', { maximumFractionDigits: 0 })} km³`,
+                `${(resStats.freshwater * 10).toLocaleString('ja-JP', { maximumFractionDigits: 0 })} 億立方メートル`,
+                `${resStats.freshwater.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} км³`,
+              )}
             />
           )}
           {fbAgri && (
@@ -422,11 +463,12 @@ export default function InfoPanel() {
         {(() => {
           const anthem = anthems[selected.cca3]
           if (!anthem || (!anthem.nameEn && !anthem.nameZh)) return null
+          const anthemName = uiLang === 'zh'
+            ? (anthem.nameZh ?? anthem.nameEn)
+            : (pick(lang, null, anthem.nameEn, anthem.nameJa, anthem.nameRu) ?? anthem.nameEn ?? anthem.nameZh)
           return (
             <Section title={t('panel.anthem')}>
-              <p className="text-sm font-medium text-slate-200">
-                {zh ? (anthem.nameZh ?? anthem.nameEn) : (anthem.nameEn ?? anthem.nameZh)}
-              </p>
+              <p className="text-sm font-medium text-slate-200">{anthemName}</p>
               {anthem.audio ? (
                 <audio
                   key={selected.cca3}

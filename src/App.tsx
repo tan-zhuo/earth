@@ -19,6 +19,7 @@ import { fetchAllGdp } from './services/worldbank'
 import { useAppStore } from './store/useAppStore'
 import { SITE_URL } from './seo'
 import { countryName } from './utils/countryName'
+import { pick } from './i18n/pick'
 
 export default function App() {
   const { t, i18n } = useTranslation()
@@ -62,9 +63,13 @@ export default function App() {
       : base
     const desc = document.querySelector<HTMLMetaElement>('meta[name="description"]')
     if (desc && selected) {
-      desc.content = zh
-        ? `${selected.nameZh}（${selected.nameEn}）：首都、人口、GDP、政治体制等信息，交互式 3D 地球。`
-        : `${selected.nameEn}: capital, population, GDP and government on an interactive 3D globe.`
+      desc.content = pick(
+        lang,
+        `${selected.nameZh}（${selected.nameEn}）：首都、人口、GDP、政治体制等信息，交互式 3D 地球。`,
+        `${selected.nameEn}: capital, population, GDP and government on an interactive 3D globe.`,
+        `${selected.nameJa}（${selected.nameEn}）：首都、人口、GDP、政治体制などをインタラクティブな 3D 地球で。`,
+        `${selected.nameRu} (${selected.nameEn}): столица, население, ВВП и форма правления на интерактивном 3D-глобусе.`,
+      )
     }
   }, [selected, i18n.language])
 
@@ -98,13 +103,13 @@ export default function App() {
       {/* 底部操作提示（地球视图未选中国家时显示） */}
       {view === 'earth' && !selected && !timeTravel && (
         <p className="pointer-events-none fixed inset-x-0 bottom-4 z-10 text-center text-xs text-slate-500">
-          <span className="sm:hidden">{i18n.language.startsWith('zh') ? '拖动旋转 · 双指缩放 · 点击国家' : 'Drag to rotate · Pinch to zoom · Select a country'}</span>
+          <span className="sm:hidden">{pick(i18n.language, '拖动旋转 · 双指缩放 · 点击国家', 'Drag to rotate · Pinch to zoom · Select a country', 'ドラッグで回転 · ピンチでズーム · 国をタップ', 'Вращайте касанием · масштаб щипком · выберите страну')}</span>
           <span className="hidden sm:inline">{t('hint')} · {t('scaleHintEarth')}</span>
         </p>
       )}
       {view !== 'earth' && view !== 'earthStructure' && view !== 'mars' && view !== 'spacecraft' && (
         <p className="pointer-events-none fixed inset-x-0 bottom-4 z-10 text-center text-xs text-slate-500">
-          {['solar', 'galaxy', 'universe'].includes(view) ? (i18n.language.startsWith('zh') ? '拖动旋转 · 滚轮缩放 · 点击标签探索' : 'Drag to orbit · Scroll to zoom · Select a label to explore') : t('scaleHintSpace')}
+          {['solar', 'galaxy', 'universe'].includes(view) ? pick(i18n.language, '拖动旋转 · 滚轮缩放 · 点击标签探索', 'Drag to orbit · Scroll to zoom · Select a label to explore', 'ドラッグで回転 · スクロールでズーム · ラベルを選んで探索', 'Перетащите для вращения · колесо для масштаба · выберите метку') : t('scaleHintSpace')}
         </p>
       )}
 

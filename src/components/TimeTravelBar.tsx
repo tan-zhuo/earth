@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/useAppStore'
 import { PALEO_ERAS } from '../data/paleoEras'
+import { tr } from '../i18n/pick'
 
 const PLAY_INTERVAL = 1500 // 自动播放每个时代停留毫秒数（含 700ms 交叉淡化）
 
@@ -12,7 +13,6 @@ export default function TimeTravelBar() {
   const setEraIndex = useAppStore((s) => s.setEraIndex)
   const [playing, setPlaying] = useState(false)
 
-  const zh = i18n.language.startsWith('zh')
 
   // 贴图预载由 GlobeView 负责（解码 + GPU 上传），这里只需在退出时停止播放
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function TimeTravelBar() {
         {/* 时代信息 */}
         <div className="mb-3 flex items-baseline justify-between gap-3">
           <div>
-            <span className="text-lg font-bold text-slate-100">{zh ? era.nameZh : era.nameEn}</span>
+            <span className="text-lg font-bold text-slate-100">{tr(era, 'name', i18n.language)}</span>
             <span className="ml-2 text-xs text-sky-400">
               {era.ma > 0 ? `${era.ma} ${t('timeTravelMa')}` : t('timeTravelNow')}
             </span>
@@ -62,7 +62,7 @@ export default function TimeTravelBar() {
             {playing ? t('timeTravelPause') : t('timeTravelPlay')}
           </button>
         </div>
-        <p className="mb-3 text-xs text-slate-400">{zh ? era.descZh : era.descEn}</p>
+        <p className="mb-3 text-xs text-slate-400">{tr(era, 'desc', i18n.language)}</p>
 
         {/* 时间轴滑块：左端最古老，右端现代 */}
         <input

@@ -9,6 +9,7 @@ import { makeStarTexture, makeGlowTexture } from '../../utils/spriteTextures'
 import SpaceExplorer, { useExplorer } from './SpaceExplorer'
 import { GALAXY_ITEMS, GALAXY_LAYERS } from '../../data/spaceExplore'
 import { createSpaceScene, createSpaceLabels, seededRandom } from './spaceScene'
+import { tr } from '../../i18n/pick'
 
 const RADIUS = 70
 const ARMS = 4
@@ -20,7 +21,7 @@ export default function GalaxyView() {
   const containerRef = useRef<HTMLDivElement>(null)
   const labelsRef = useRef<HTMLDivElement>(null)
   const { i18n } = useTranslation()
-  const zh = i18n.language.startsWith('zh')
+  const lang = i18n.language
   const explorer = useExplorer(GALAXY_LAYERS)
   const { live } = explorer
 
@@ -226,7 +227,7 @@ export default function GalaxyView() {
       halo: new Vector3(17, 25, -10),
     }
     for (const item of GALAXY_ITEMS.slice(1)) {
-      labels.add(item.id, zh ? item.nameZh : item.nameEn, item.color,
+      labels.add(item.id, tr(item, 'name', lang), item.color,
         () => destinations[item.id].clone().applyMatrix4(galaxy.matrixWorld))
     }
     const orbit = new LineLoop(new BufferGeometry().setFromPoints(Array.from({ length: 180 }, (_, i) => {
@@ -252,14 +253,19 @@ export default function GalaxyView() {
     return () => { labels.dispose(); runtime.dispose() }
     // Settings are read through live; controls never rebuild the scene.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zh])
+  }, [lang])
 
   return (
     <>
       <div ref={containerRef} className="space-stage" />
       <div ref={labelsRef} className="space-stage pointer-events-none overflow-hidden" />
       <SpaceExplorer kind="galaxy" explorer={explorer} items={GALAXY_ITEMS} layers={GALAXY_LAYERS}
-        note={['银河系结构与地标位置为示意；粒子代表恒星群，旋转仅用于展示。', 'Structure and landmark positions are schematic. Particles represent stellar populations; rotation is illustrative.']} />
+        note={[
+          '银河系结构与地标位置为示意；粒子代表恒星群，旋转仅用于展示。',
+          'Structure and landmark positions are schematic. Particles represent stellar populations; rotation is illustrative.',
+          '天の川銀河の構造と目印の位置はイメージです。粒子は恒星の集団を表し、回転は説明のためのものです。',
+          'Структура и положение меток схематичны. Частицы изображают звёздные населения; вращение показано условно.',
+        ]} />
     </>
   )
 }

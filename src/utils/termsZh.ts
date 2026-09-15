@@ -1,8 +1,12 @@
 /**
  * Factbook 资源/农产品/工业清单的中文术语词典。
  * 这类清单词汇高度标准化，逐词翻译可覆盖绝大多数条目；
- * 词典未收录的词保留英文原文。
+ * 词典未收录的词保留英文原文。日文/俄文词典见 termsJa.ts / termsRu.ts（同一组键）。
  */
+import { langOf } from '../i18n/pick'
+import { DICT_JA } from './termsJa'
+import { DICT_RU } from './termsRu'
+
 const DICT: Record<string, string> = {
   // ---- 矿产与能源 ----
   'coal': '煤炭', 'iron ore': '铁矿石', 'petroleum': '石油', 'crude petroleum': '原油',
@@ -116,19 +120,28 @@ const DICT: Record<string, string> = {
   'wine making': '酿酒', 'winemaking': '酿酒', 'olive oil production': '橄榄油生产',
 }
 
+const DICTS: Record<'zh' | 'ja' | 'ru', { dict: Record<string, string>; sep: string }> = {
+  zh: { dict: DICT, sep: '、' },
+  ja: { dict: DICT_JA, sep: '、' },
+  ru: { dict: DICT_RU, sep: ', ' },
+}
+
 /**
- * 将 factbook 英文清单逐词翻译为中文（未收录词保留英文）。
- * 输入形如 "coal, iron ore, petroleum"，输出 "煤炭、铁矿石、石油"。
+ * 将 factbook 英文清单逐词翻译为中/日/俄文（未收录词保留英文；英文界面原样返回）。
+ * 输入形如 "coal, iron ore, petroleum"，中文输出 "煤炭、铁矿石、石油"。
  */
-export function translateTerms(text: string): string {
+export function translateTerms(text: string, lang: string): string {
+  const target = langOf(lang)
+  if (target === 'en') return text
+  const { dict, sep } = DICTS[target]
   return text
     .split(/[,;]\s*/)
     .map((raw) => {
       let item = raw.trim().replace(/^and\s+/i, '')
       if (!item) return null
       const key = item.toLowerCase()
-      return DICT[key] ?? DICT[key.replace(/s$/, '')] ?? item
+      return dict[key] ?? dict[key.replace(/s$/, '')] ?? item
     })
     .filter(Boolean)
-    .join('、')
+    .join(sep)
 }

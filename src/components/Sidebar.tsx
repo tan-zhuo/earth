@@ -9,6 +9,7 @@ import Icon, { type IconName } from './Icon'
 import { EXAGGERATION_MAX } from '../data/terrain'
 import { LANGUAGES } from '../i18n'
 import { countryName } from '../utils/countryName'
+import { tr } from '../i18n/pick'
 
 const VIEWS: SpaceView[] = ['earth', 'moon', 'solar', 'galaxy', 'universe']
 
@@ -43,7 +44,6 @@ function SectionTitle({ children }: { children: string }) {
 
 export default function Sidebar() {
   const { t, i18n } = useTranslation()
-  const zh = i18n.language.startsWith('zh')
 
   const sidebarOpen = useAppStore((s) => s.sidebarOpen)
   const setSidebarOpen = useAppStore((s) => s.setSidebarOpen)
@@ -286,9 +286,9 @@ export default function Sidebar() {
                     : 'border-slate-700/50 text-slate-300 hover:border-sky-500/40 hover:text-sky-200'
                 }`}
               >
-                <Icon name="satellite" size={20} style={{ marginBottom: 10 }} /><span className="block text-sm leading-tight">{zh ? c.nameZh : c.nameEn}</span>
+                <Icon name="satellite" size={20} style={{ marginBottom: 10 }} /><span className="block text-sm leading-tight">{tr(c, 'name', i18n.language)}</span>
                 <span className="mt-0.5 block text-[10px] text-slate-500">
-                  {zh ? c.kindZh : c.kindEn}
+                  {tr(c, 'kind', i18n.language)}
                 </span>
               </button>
             ))}
