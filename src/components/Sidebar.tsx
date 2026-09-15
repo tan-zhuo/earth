@@ -7,6 +7,8 @@ import type { Country } from '../types'
 import { SPACECRAFT_MODELS } from '../data/spacecraftModels'
 import Icon, { type IconName } from './Icon'
 import { EXAGGERATION_MAX } from '../data/terrain'
+import { LANGUAGES } from '../i18n'
+import { countryName } from '../utils/countryName'
 
 const VIEWS: SpaceView[] = ['earth', 'moon', 'solar', 'galaxy', 'universe']
 
@@ -82,6 +84,10 @@ export default function Sidebar() {
         (c) =>
           c.nameZh.includes(q) ||
           c.officialZh.includes(q) ||
+          c.nameJa.includes(q) ||
+          c.officialJa.includes(q) ||
+          c.nameRu.toLowerCase().includes(q) ||
+          c.officialRu.toLowerCase().includes(q) ||
           c.nameEn.toLowerCase().includes(q) ||
           c.officialEn.toLowerCase().includes(q) ||
           c.cca2.toLowerCase() === q ||
@@ -155,7 +161,7 @@ export default function Sidebar() {
                         className="h-5 w-8"
                       />
                       <span className="min-w-0 flex-1 truncate text-sm text-slate-200">
-                        {zh ? c.nameZh : c.nameEn}
+                        {countryName(c, i18n.language)}
                       </span>
                       <span className="text-[10px] text-slate-500">{c.cca3}</span>
                     </button>
@@ -293,12 +299,21 @@ export default function Sidebar() {
 
         {/* 底部：语言与链接 */}
         <div className="border-t border-slate-700/40 p-3">
-          <button
-            onClick={() => i18n.changeLanguage(zh ? 'en' : 'zh')}
-            className="mb-2 w-full rounded-lg border border-slate-700/60 px-3 py-2 text-sm text-slate-300 transition hover:border-sky-500/60 hover:text-sky-300"
-          >
-            {zh ? 'Switch to English' : '切换为中文'}
-          </button>
+          <div className="mb-2 grid grid-cols-4 gap-1" role="group" aria-label="Language">
+            {LANGUAGES.map(l => {
+              const active = i18n.language.startsWith(l.code)
+              return (
+                <button
+                  key={l.code}
+                  onClick={() => i18n.changeLanguage(l.code)}
+                  aria-pressed={active}
+                  className={`rounded-lg border px-1 py-2 text-xs transition ${active ? 'border-sky-500/70 bg-sky-500/15 text-sky-300' : 'border-slate-700/60 text-slate-300 hover:border-sky-500/60 hover:text-sky-300'}`}
+                >
+                  {l.label}
+                </button>
+              )
+            })}
+          </div>
           <div className="flex justify-center gap-3 text-xs text-slate-500">
             <a
               href="https://tanzhuo.xyz"

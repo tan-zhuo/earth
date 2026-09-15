@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/useAppStore'
+import { LANGUAGES } from '../i18n'
 
 const btnBase =
   'inline-flex min-h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-slate-700/60 bg-slate-900/60 px-3 py-1.5 text-xs font-medium text-slate-300 backdrop-blur transition hover:border-sky-500/60 hover:text-sky-300'
@@ -59,8 +60,6 @@ export default function Header() {
   const view = useAppStore((s) => s.view)
   const setSidebarOpen = useAppStore((s) => s.setSidebarOpen)
   const [fullscreen, toggleFullscreen] = useFullscreen()
-
-  const zh = i18n.language.startsWith('zh')
 
   return (
     <header className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between gap-2 p-3 sm:p-4">
@@ -122,13 +121,17 @@ export default function Header() {
             </svg>
           </button>
         )}
-        <button
-          onClick={() => i18n.changeLanguage(zh ? 'en' : 'zh')}
-          className={btnBase}
-          aria-label="Switch language"
-        >
-          {zh ? 'EN' : '中文'}
-        </button>
+        <label className={`${btnBase} relative`}>
+          <span aria-hidden="true">{LANGUAGES.find(l => i18n.language.startsWith(l.code))?.label ?? 'English'}</span>
+          <select
+            value={LANGUAGES.find(l => i18n.language.startsWith(l.code))?.code ?? 'en'}
+            onChange={e => i18n.changeLanguage(e.target.value)}
+            aria-label="Language"
+            className="absolute inset-0 cursor-pointer opacity-0"
+          >
+            {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+          </select>
+        </label>
       </div>
     </header>
   )

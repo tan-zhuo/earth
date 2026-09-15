@@ -26,6 +26,7 @@ const factbook = factbookRaw as Record<
 import { incomeGroupOf } from '../types'
 import type { WbStats } from '../types'
 import { formatBigNumber, formatUsd, formatExact } from '../utils/format'
+import { countryName, countryAltName, countryOfficialName } from '../utils/countryName'
 
 /** 大洲名称中译（数据集的 region 只有英文） */
 const regionZh: Record<string, string> = {
@@ -123,7 +124,7 @@ export default function InfoPanel() {
     if (!selected) return
     let cancelled = false
     setHistoryLoading(true)
-    fetchCountryHistory(selected, i18n.language.startsWith('zh') ? 'zh' : 'en')
+    fetchCountryHistory(selected, (['zh', 'ja', 'ru'] as const).find(l => i18n.language.startsWith(l)) ?? 'en')
       .then((h) => !cancelled && setHistory(h))
       .catch(() => !cancelled && setHistory(null))
       .finally(() => !cancelled && setHistoryLoading(false))
@@ -138,9 +139,9 @@ export default function InfoPanel() {
   const zh = lang.startsWith('zh')
   const extra = countryExtras[selected.cca3]
 
-  const name = zh ? selected.nameZh : selected.nameEn
-  const altName = zh ? selected.nameEn : selected.nameZh
-  const official = zh ? selected.officialZh : selected.officialEn
+  const name = countryName(selected, lang)
+  const altName = countryAltName(selected, lang)
+  const official = countryOfficialName(selected, lang)
   const capital = zh && extra?.capitalZh ? extra.capitalZh : selected.capital.join(', ') || '—'
   const region = zh ? (regionZh[selected.region] ?? selected.region) : selected.region
   const government = extra ? (zh ? extra.govZh : extra.govEn) : null

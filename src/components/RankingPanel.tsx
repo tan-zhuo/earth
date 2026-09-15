@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/useAppStore'
 import { OIL_PRODUCTION, GAS_PRODUCTION } from '../data/resources'
 import { formatUsd } from '../utils/format'
+import { countryName } from '../utils/countryName'
 import type { Country } from '../types'
 
 type TabKey = 'gdp' | 'exports' | 'imports' | 'oil' | 'gas'
@@ -133,7 +134,7 @@ export default function RankingPanel() {
                   className="relative h-4 w-6 shrink-0 rounded-sm border border-slate-700/60 object-cover"
                 />
                 <span className="relative min-w-0 flex-1 truncate text-sm text-slate-200">
-                  {zh ? row.country.nameZh : row.country.nameEn}
+                  {countryName(row.country, lang)}
                 </span>
                 <span className="relative shrink-0 text-xs font-medium text-slate-300">{row.display}</span>
               </button>

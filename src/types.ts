@@ -8,6 +8,10 @@ export interface Country {
   officialEn: string
   nameZh: string
   officialZh: string
+  nameJa: string
+  officialJa: string
+  nameRu: string
+  officialRu: string
   capital: string[]
   /** 面积，平方公里 */
   area: number

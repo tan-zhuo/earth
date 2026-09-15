@@ -19,6 +19,7 @@ import { incomeGroupOf } from '../types'
 import type { Country } from '../types'
 import type { GdpEntry } from '../services/worldbank'
 import { formatUsd } from '../utils/format'
+import { countryName, countryAltName } from '../utils/countryName'
 import { PALEO_ERAS } from '../data/paleoEras'
 import { PORTS, ROUTE_LEGS } from '../data/shippingRoutes'
 import type { Port } from '../data/shippingRoutes'
@@ -235,9 +236,8 @@ export default function GlobeView() {
       .polygonLabel((f) => {
         const cf = f as CountryFeature
         const c = countryOf(cf)
-        const zh = langRef.current.startsWith('zh')
-        const primary = c ? (zh ? c.nameZh : c.nameEn) : (cf.properties?.name ?? '')
-        const secondary = c ? (zh ? c.nameEn : c.nameZh) : ''
+        const primary = c ? countryName(c, langRef.current) : (cf.properties?.name ?? '')
+        const secondary = c ? countryAltName(c, langRef.current) : ''
         return `<div style="font-family:system-ui;padding:6px 10px;background:rgba(2,6,23,.85);
           border:1px solid rgba(56,189,248,.4);border-radius:8px;backdrop-filter:blur(4px)">
           <div style="font-size:14px;font-weight:600;color:#e2e8f0">${primary}</div>
@@ -640,7 +640,7 @@ export default function GlobeView() {
           const button = document.createElement('button')
           button.className = 'globe-flag'
           button.dataset.country = c.cca3
-          const name = zh ? c.nameZh : c.nameEn
+          const name = countryName(c, langRef.current)
           button.title = name
           button.setAttribute('aria-label', name)
           const img = document.createElement('img')
@@ -673,7 +673,7 @@ export default function GlobeView() {
     const layout = (now: number) => {
       if (now - last > 120 && useAppStore.getState().view === 'earth' && !document.hidden) {
         last = now
-        const width = Math.round(Math.min(52, Math.max(28, 34 + (2.5 - world.pointOfView().altitude) * 12)))
+        const width = Math.round(Math.min(44, Math.max(23, 28 + (2.5 - world.pointOfView().altitude) * 10)))
         const active = document.activeElement
         const selectedCode = selectedRef.current?.cca3
         const items = [...flagNodes].sort((a, b) =>

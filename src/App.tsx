@@ -18,6 +18,7 @@ import SpacecraftView from './components/space/SpacecraftView'
 import { fetchAllGdp } from './services/worldbank'
 import { useAppStore } from './store/useAppStore'
 import { SITE_URL } from './seo'
+import { countryName } from './utils/countryName'
 
 export default function App() {
   const { t, i18n } = useTranslation()
@@ -52,11 +53,12 @@ export default function App() {
 
   // SEO：标题、<html lang>、描述随语言和选中国家动态更新
   useEffect(() => {
-    const zh = i18n.language.startsWith('zh')
-    document.documentElement.lang = zh ? 'zh-CN' : 'en'
-    const base = zh ? 'Earth · 3D 互动地球' : 'Earth · Interactive 3D World Atlas'
+    const lang = i18n.language
+    const zh = lang.startsWith('zh')
+    document.documentElement.lang = zh ? 'zh-CN' : lang.startsWith('ja') ? 'ja' : lang.startsWith('ru') ? 'ru' : 'en'
+    const base = `Earth · ${i18n.t('appSubtitle')}`
     document.title = selected
-      ? `${zh ? selected.nameZh : selected.nameEn} - ${base}`
+      ? `${countryName(selected, lang)} - ${base}`
       : base
     const desc = document.querySelector<HTMLMetaElement>('meta[name="description"]')
     if (desc && selected) {
