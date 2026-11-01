@@ -18,10 +18,14 @@ export type SpaceView =
   | 'mars'
   | 'spacecraft'
 
+export type EarthAppearance = 'day' | 'night' | 'real'
+const APPEARANCES: EarthAppearance[] = ['day', 'night', 'real']
+
 interface AppState {
+  /** 地球外观：白天贴图 / 夜景灯光 / 按此刻真实太阳位置的昼夜光照 */
+  earthAppearance: EarthAppearance
+  setEarthAppearance: (mode: EarthAppearance) => void
   /** 当前尺度视图 */
-  earthAppearance: 'day' | 'night'
-  setEarthAppearance: (mode: 'day' | 'night') => void
   view: SpaceView
   countries: Country[]
   /** ccn3（ISO numeric）→ Country，供 GeoJSON feature.id 快速查找 */
@@ -32,6 +36,10 @@ interface AppState {
   showGdpBars: boolean
   showFlags: boolean
   showSatellites: boolean
+  /** 云层（白天/实时外观下显示，贴近地表时自动淡出） */
+  showClouds: boolean
+  /** 地名：选中国家的省级区划 + 按缩放逐级显示的城市 */
+  showPlaces: boolean
   /** 全球 GDP 数据（ISO3 → 最新值），供柱状图使用 */
   gdpAll: Record<string, GdpEntry> | null
   /** 时间旅行（大陆漂移）模式 */
@@ -56,6 +64,8 @@ interface AppState {
   toggleGdpBars: () => void
   toggleFlags: () => void
   toggleSatellites: () => void
+  toggleClouds: () => void
+  togglePlaces: () => void
   setGdpAll: (data: Record<string, GdpEntry>) => void
   toggleTimeTravel: () => void
   setEraIndex: (i: number) => void
@@ -77,7 +87,12 @@ interface AppState {
 const countries = getAllCountries()
 
 export const useAppStore = create<AppState>((set) => ({
-  earthAppearance: (() => { try { return localStorage.getItem('earth:appearance') === 'night' ? 'night' : 'day' } catch { return 'day' } })(),
+  earthAppearance: (() => {
+    try {
+      const saved = localStorage.getItem('earth:appearance') as EarthAppearance | null
+      return saved && APPEARANCES.includes(saved) ? saved : 'day'
+    } catch { return 'day' }
+  })(),
   setEarthAppearance: (mode) => {
     try { localStorage.setItem('earth:appearance', mode) } catch { /* Private browsing can disable storage. */ }
     set({ earthAppearance: mode })
@@ -90,6 +105,8 @@ export const useAppStore = create<AppState>((set) => ({
   showGdpBars: false,
   showFlags: false,
   showSatellites: false,
+  showClouds: true,
+  showPlaces: true,
   gdpAll: null,
   timeTravel: false,
   eraIndex: 0,
@@ -105,6 +122,8 @@ export const useAppStore = create<AppState>((set) => ({
   toggleGdpBars: () => set((s) => ({ showGdpBars: !s.showGdpBars })),
   toggleFlags: () => set((s) => ({ showFlags: !s.showFlags })),
   toggleSatellites: () => set((s) => ({ showSatellites: !s.showSatellites })),
+  toggleClouds: () => set((s) => ({ showClouds: !s.showClouds })),
+  togglePlaces: () => set((s) => ({ showPlaces: !s.showPlaces })),
   setGdpAll: (data) => set({ gdpAll: data }),
   // 进入时间旅行：从最古老时代开始，并关闭已打开的国家详情
   toggleTimeTravel: () =>

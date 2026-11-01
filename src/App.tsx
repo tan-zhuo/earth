@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import GlobeView from './components/GlobeView'
 import Header from './components/Header'
@@ -8,6 +8,7 @@ import InfoPanel from './components/InfoPanel'
 import TimeTravelBar from './components/TimeTravelBar'
 import RankingPanel from './components/RankingPanel'
 import TerrainPanel from './components/TerrainPanel'
+import DailyPick from './components/DailyPick'
 import MoonView from './components/space/MoonView'
 import SolarSystemView from './components/space/SolarSystemView'
 import GalaxyView from './components/space/GalaxyView'
@@ -17,15 +18,19 @@ import MarsView from './components/space/MarsView'
 import SpacecraftView from './components/space/SpacecraftView'
 import { fetchAllGdp } from './services/worldbank'
 import { useAppStore } from './store/useAppStore'
-import { SITE_URL } from './seo'
-import { countryName } from './utils/countryName'
-import { pick } from './i18n/pick'
+import { HREFLANG, SITE_URL, countryMeta, homeMeta } from './seo'
+import { parseRoute, buildUrl } from './routing'
+import { PALEO_ERAS } from './data/paleoEras'
+import { langOf, pick } from './i18n/pick'
 
 export default function App() {
   const { t, i18n } = useTranslation()
   const selected = useAppStore((s) => s.selected)
   const timeTravel = useAppStore((s) => s.timeTravel)
   const view = useAppStore((s) => s.view)
+  const eraIndex = useAppStore((s) => s.eraIndex)
+  const craftId = useAppStore((s) => s.craftId)
+  const showRankings = useAppStore((s) => s.showRankings)
   const setGdpAll = useAppStore((s) => s.setGdpAll)
 
   // 启动时批量拉取全球 GDP（一次请求 + 30 天缓存），供 3D 柱状图使用
@@ -35,42 +40,59 @@ export default function App() {
       .catch((err) => console.error('全球 GDP 加载失败', err))
   }, [setGdpAll])
 
-  // 国家深链：/country/{cca3} 直达该国（SEO 可索引页面）
+  /** URL 是否带语言前缀：从带前缀的链接进来，或用户手动切换过语言后，链接都带上语言 */
+  const prefixedRef = useRef(false)
+
+  // 深链：/{lang}/country/{cca3}、?view=…、?era=… 直达对应语言、国家、视图或时代
   useEffect(() => {
-    const m = window.location.pathname.match(/^\/country\/([a-z]{3})$/i)
-    if (!m) return
-    const { countries, select } = useAppStore.getState()
-    const c = countries.find((x) => x.cca3.toLowerCase() === m[1].toLowerCase())
-    if (c) select(c)
+    const route = parseRoute(window.location.pathname, window.location.search)
+    const s = useAppStore.getState()
+    if (route.lang) {
+      prefixedRef.current = true
+      if (langOf(i18n.language) !== route.lang) void i18n.changeLanguage(route.lang)
+    }
+    if (route.country) {
+      const c = s.countries.find((x) => x.cca3 === route.country)
+      if (c) s.select(c)
+    } else if (route.view === 'spacecraft' && route.craft) {
+      s.setCraft(route.craft)
+    } else if (route.view && route.view !== 'earth') {
+      s.setView(route.view)
+    } else if (route.era != null) {
+      const index = PALEO_ERAS.findIndex((e) => e.ma === route.era)
+      if (index >= 0) {
+        s.toggleTimeTravel()
+        s.setEraIndex(index)
+      }
+    }
+    const onLanguage = () => { prefixedRef.current = true }
+    i18n.on('languageChanged', onLanguage)
+    return () => i18n.off('languageChanged', onLanguage)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 选中变化时同步 URL 与 canonical（replaceState 不污染历史记录）
+  // 状态变化时同步 URL 与 canonical（replaceState 不污染历史记录），任何画面都能直接复制链接分享
   useEffect(() => {
-    const path = selected ? `/country/${selected.cca3.toLowerCase()}` : '/'
-    if (window.location.pathname !== path) window.history.replaceState(null, '', path)
+    const url = buildUrl({
+      lang: prefixedRef.current ? langOf(i18n.language) : null,
+      country: selected?.cca3 ?? null,
+      view,
+      era: timeTravel ? PALEO_ERAS[eraIndex].ma : null,
+      craft: view === 'spacecraft' ? craftId : null,
+    })
+    if (window.location.pathname + window.location.search !== url) window.history.replaceState(null, '', url)
     const canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]')
-    if (canonical) canonical.href = `${SITE_URL}${path === '/' ? '/' : path}`
-  }, [selected])
+    if (canonical) canonical.href = `${SITE_URL}${window.location.pathname}`
+  }, [selected, view, timeTravel, eraIndex, craftId, i18n.language])
 
-  // SEO：标题、<html lang>、描述随语言和选中国家动态更新
+  // SEO：标题、<html lang>、描述随语言和选中国家动态更新（与预渲染的静态页同源）
   useEffect(() => {
-    const lang = i18n.language
-    const zh = lang.startsWith('zh')
-    document.documentElement.lang = zh ? 'zh-CN' : lang.startsWith('ja') ? 'ja' : lang.startsWith('ru') ? 'ru' : 'en'
-    const base = `Earth · ${i18n.t('appSubtitle')}`
-    document.title = selected
-      ? `${countryName(selected, lang)} - ${base}`
-      : base
+    const lang = langOf(i18n.language)
+    document.documentElement.lang = HREFLANG[lang]
+    const meta = selected ? countryMeta(selected, lang) : homeMeta(lang)
+    document.title = meta.title
     const desc = document.querySelector<HTMLMetaElement>('meta[name="description"]')
-    if (desc && selected) {
-      desc.content = pick(
-        lang,
-        `${selected.nameZh}（${selected.nameEn}）：首都、人口、GDP、政治体制等信息，交互式 3D 地球。`,
-        `${selected.nameEn}: capital, population, GDP and government on an interactive 3D globe.`,
-        `${selected.nameJa}（${selected.nameEn}）：首都、人口、GDP、政治体制などをインタラクティブな 3D 地球で。`,
-        `${selected.nameRu} (${selected.nameEn}): столица, население, ВВП и форма правления на интерактивном 3D-глобусе.`,
-      )
-    }
+    if (desc) desc.content = meta.description
   }, [selected, i18n.language])
 
   return (
@@ -94,6 +116,7 @@ export default function App() {
           <RankingPanel />
           <TerrainPanel />
           <EarthAppearance />
+          {!selected && !timeTravel && !showRankings && <DailyPick />}
         </>
       )}
 

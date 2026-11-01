@@ -1,6 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "rewrites": [{ "source": "/country/:code", "destination": "/index.html" }],
+  "rewrites": [
+    { "source": "/country/:code", "destination": "/index.html" },
+    { "source": "/:lang(zh|en|ja|ru)", "destination": "/index.html" },
+    { "source": "/:lang(zh|en|ja|ru)/country/:code", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/textures/(.*)",
@@ -13,6 +17,13 @@
     {
       "source": "/og.png",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" },
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
     }
   ]
 }

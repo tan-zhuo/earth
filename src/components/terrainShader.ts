@@ -145,7 +145,10 @@ export function attachTerrain(material: MeshPhongMaterial): TerrainController {
     uMask: { value: 0 },
   }
 
-  material.onBeforeCompile = (shader) => {
+  // 与其他注入（昼夜光照）串联：先跑已有的，再追加地形
+  const previous = material.onBeforeCompile
+  material.onBeforeCompile = (shader, renderer) => {
+    previous.call(material, shader, renderer)
     Object.assign(shader.uniforms, uniforms)
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${VERT_PARS}`)
@@ -211,7 +214,7 @@ export function attachTerrain(material: MeshPhongMaterial): TerrainController {
       disposed = true
       ownedTextures.forEach(texture => texture.dispose())
       lut.dispose()
-      material.onBeforeCompile = () => {}
+      material.onBeforeCompile = previous
       material.needsUpdate = true
     },
   }

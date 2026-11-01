@@ -15,6 +15,7 @@ const paths = {
   top: 'm12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5',
   rotate: 'M4 8c3-6 13-6 16 0m0-5v5h-5M20 16c-3 6-13 6-16 0m0 5v-5h5',
   pin: 'M18 9c0 5-6 12-6 12S6 14 6 9a6 6 0 1 1 12 0ZM14 9a2 2 0 1 1-4 0 2 2 0 0 1 4 0',
+  share: 'M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6M16 7l-4-4-4 4M12 3v12',
   focus: 'M3 8V3h5m8 0h5v5M3 16v5h5m8 0h5v-5M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
 } as const
 export type IconName = keyof typeof paths

@@ -14,3 +14,10 @@ createRoot(document.getElementById('root')!).render(
     <SpeedInsights />
   </StrictMode>,
 )
+
+// PWA：生产环境注册 Service Worker（静态资源离线缓存，二次打开秒开）
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => console.warn('Service Worker 注册失败', err))
+  })
+}

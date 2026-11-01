@@ -5,7 +5,7 @@ import type { GlobeInstance } from 'globe.gl'
 import {
   TextureLoader, SRGBColorSpace, MeshPhongMaterial, Group, Mesh as ThreeMesh, SphereGeometry,
   MeshBasicMaterial, BufferGeometry, Float32BufferAttribute, LineLoop, LineBasicMaterial, Vector3,
-  Raycaster, Sphere, Vector2, AmbientLight, DirectionalLight, Color,
+  Raycaster, Sphere, Vector2, AmbientLight, DirectionalLight,
 } from 'three'
 import type { Mesh, Texture, PerspectiveCamera } from 'three'
 import { EARTH_SATELLITES } from '../data/spacecraft'
@@ -31,6 +31,11 @@ import { attachTerrain } from './terrainShader'
 import type { TerrainController } from './terrainShader'
 import type { LineSegments } from 'three'
 import { EARTH_RADIUS_M, MAX_TERRAIN_M, loadElevationSampler } from '../data/terrain'
+import { attachEarthLighting, subsolarPoint } from './earthLighting'
+import type { EarthLighting } from './earthLighting'
+import { createPlacesLayer } from './placesLayer'
+import type { AdminFeature, AdminProps, CityRow, PlacesLayer } from './placesLayer'
+import { langOf } from '../i18n/pick'
 import type { ElevationSampler } from '../data/terrain'
 
 type CountryFeature = Feature<Geometry, { name?: string }>
@@ -115,6 +120,8 @@ export default function GlobeView() {
   const exaggeration = useAppStore((s) => s.exaggeration)
   const showElevationTint = useAppStore((s) => s.showElevationTint)
   const setCursor = useAppStore((s) => s.setCursor)
+  const showClouds = useAppStore((s) => s.showClouds)
+  const showPlaces = useAppStore((s) => s.showPlaces)
   const featsRef = useRef<CountryFeature[]>([])
   const enteredEarthAtRef = useRef(0)
   const satLabelsRef = useRef<HTMLDivElement>(null)
@@ -133,6 +140,13 @@ export default function GlobeView() {
   const bordersRef = useRef<LineSegments | null>(null)
   /** 悬停/选中高亮掩码（画进地表，跟着地形起伏） */
   const maskRef = useRef<TerrainMask | null>(null)
+  /** 昼夜光照 / 海面反光 / 云层（地球网格就绪后挂载） */
+  const lightingRef = useRef<EarthLighting | null>(null)
+  const [meshReady, setMeshReady] = useState(false)
+  /** 地名覆盖层（城市 + 省级区划） */
+  const placesCanvasRef = useRef<HTMLCanvasElement>(null)
+  const placesRef = useRef<PlacesLayer | null>(null)
+  const citiesLoadedRef = useRef(false)
   const [featsReady, setFeatsReady] = useState(false)
   const [elevReady, setElevReady] = useState(false)
 
@@ -306,6 +320,14 @@ export default function GlobeView() {
           globeMeshRef.current = mesh
           useSphereRaycast(mesh)
           ensureTessellation(world)
+          lightingRef.current = attachEarthLighting(
+            world.globeMaterial() as MeshPhongMaterial,
+            mesh,
+            (tex) => {
+              tex.anisotropy = Math.min(8, world.renderer().capabilities.getMaxAnisotropy())
+            },
+          )
+          setMeshReady(true)
           meshDone = true
         }
       }
@@ -395,6 +417,9 @@ export default function GlobeView() {
       el.removeEventListener('pointerleave', onPointerLeave)
       ro.disconnect()
       // 地形着色器挂在这个实例的材质上，随实例一起销毁（严格模式重挂载时会重建）
+      lightingRef.current?.dispose()
+      lightingRef.current = null
+      setMeshReady(false)
       terrainRef.current?.dispose()
       terrainRef.current = null
       maskRef.current?.dispose()
@@ -405,24 +430,47 @@ export default function GlobeView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Each request is cancellable: leaving time travel always restores the chosen appearance.
+  // 地球外观。白天 / 夜景：光源跟着相机，任何角度都均匀照亮；
+  // 实时：光源放在此刻真实的太阳方向，背光面亮起城市灯光，每分钟跟着太阳挪一次。
+  // 每次请求都可取消：离开时间旅行一定会恢复所选外观。
   useEffect(() => {
     const world = globeRef.current
-    if (!world) return
+    const lighting = lightingRef.current
+    if (!world || !lighting) return
     let cancelled = false
     let texture: Texture | null = null
-    const ambient = new AmbientLight('#dbe8ff', earthAppearance === 'day' || timeTravel ? 1.65 : 2.7)
+    const mode = timeTravel ? 'day' : earthAppearance
+    const real = mode === 'real'
+    const ambient = new AmbientLight(real ? '#a9bcdc' : '#dbe8ff', real ? 0.14 : mode === 'day' ? 1.65 : 2.7)
     world.lights([ambient])
-    const key = new DirectionalLight('#fff5e6', earthAppearance === 'day' || timeTravel ? 2.6 : 0.25)
-    key.position.set(-160, 180, 220)
-    world.camera().add(key)
-    world.scene().add(world.camera())
+    const key = new DirectionalLight('#fff5e6', real ? 3.4 : mode === 'day' ? 2.6 : 0.25)
+    const scene = world.scene()
+    const camera = world.camera()
+    scene.add(camera)
+    let sunTimer = 0
+    if (real) {
+      // 太阳光是平行光：方向 = 地心指向太阳直射点
+      const placeSun = () => {
+        const { lat, lng } = subsolarPoint()
+        const { x, y, z } = world.getCoords(lat, lng, 0)
+        const dir = new Vector3(x, y, z).normalize()
+        key.position.copy(dir).multiplyScalar(1000)
+        lighting.setNight(1, dir)
+      }
+      placeSun()
+      scene.add(key)
+      sunTimer = window.setInterval(placeSun, 60_000)
+    } else {
+      key.position.set(-160, 180, 220)
+      camera.add(key)
+      lighting.setNight(0)
+    }
+    // 海陆掩码是现代海岸线，古地图上会露出今天的大陆轮廓
+    lighting.setOceanGloss(mode !== 'night' && !timeTravel)
     const material = world.globeMaterial() as MeshPhongMaterial
-    material.shininess = earthAppearance === 'day' ? 14 : 0
-    material.specular = new Color(earthAppearance === 'day' ? '#233244' : '#000000')
     const apply = async () => {
       if (timeTravel) return
-      const loaded = await new TextureLoader().loadAsync(earthAppearance === 'day' ? '/textures/earth-blue-marble.jpg' : '/textures/earth-night.jpg')
+      const loaded = await new TextureLoader().loadAsync(mode === 'night' ? '/textures/earth-night.jpg' : '/textures/earth-blue-marble.jpg')
       if (cancelled) { loaded.dispose(); return }
       texture = loaded
       loaded.colorSpace = SRGBColorSpace
@@ -437,11 +485,98 @@ export default function GlobeView() {
       void apply().catch(err => console.error('Earth appearance could not load', err))
     }, 50)
     return () => {
-      cancelled = true; window.clearInterval(timer)
-      world.camera().remove(key)
+      cancelled = true; window.clearInterval(timer); window.clearInterval(sunTimer)
+      key.parent?.remove(key)
       texture?.dispose()
     }
-  }, [earthAppearance, timeTravel])
+  }, [earthAppearance, timeTravel, meshReady])
+
+  // 云层：随缩放淡入淡出（贴近地表时让位给地名），夜景与时间旅行下隐藏
+  useEffect(() => {
+    const world = globeRef.current
+    const lighting = lightingRef.current
+    if (!world || !lighting) return
+    const wanted = showClouds && !timeTravel && earthAppearance !== 'night' && !showElevationTint && view === 'earth'
+    if (!wanted) {
+      lighting.setCloudOpacity(0)
+      return
+    }
+    let raf = 0
+    let last = performance.now()
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick)
+      const altitude = world.camera().position.length() / 100 - 1
+      // 总览时 0.75，飞到国家视角（约 0.6 以下）逐渐散开；选中国家时压淡，别挡住省界和地名
+      const target = 0.75 * Math.min(1, Math.max(0, (altitude - 0.35) / 0.6)) * (selectedRef.current ? 0.35 : 1)
+      if (Math.abs(target - lighting.cloudOpacity) > 0.005) lighting.setCloudOpacity(target)
+      lighting.tick((now - last) / 1000)
+      last = now
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [showClouds, timeTravel, earthAppearance, showElevationTint, view, meshReady])
+
+  // 地名图层：实例随地球实例创建
+  useEffect(() => {
+    const world = globeRef.current
+    const canvas = placesCanvasRef.current
+    if (!world || !canvas) return
+    const layer = createPlacesLayer({ world, canvas })
+    placesRef.current = layer
+    return () => {
+      layer.dispose()
+      placesRef.current = null
+    }
+  }, [])
+
+  // 地名开关 + 城市数据（首次开启时加载，约 450KB / gzip 后 150KB）
+  useEffect(() => {
+    const layer = placesRef.current
+    if (!layer) return
+    const on = showPlaces && view === 'earth' && !timeTravel
+    layer.setEnabled(on)
+    if (on && !citiesLoadedRef.current) {
+      citiesLoadedRef.current = true
+      fetch('/data/cities.json')
+        .then((r) => r.json())
+        .then((rows: CityRow[]) => placesRef.current?.setCities(rows))
+        .catch((err) => {
+          citiesLoadedRef.current = false
+          console.error('城市数据加载失败', err)
+        })
+    }
+  }, [showPlaces, view, timeTravel])
+
+  useEffect(() => {
+    placesRef.current?.setLanguage(langOf(i18n.language))
+  }, [i18n.language])
+
+  // 选中国家 → 按需加载其省级区划（每国一个 TopoJSON，小国没有）
+  useEffect(() => {
+    const layer = placesRef.current
+    if (!layer) return
+    if (!selected || !showPlaces) {
+      layer.setRegions(selected?.cca3 ?? null, null)
+      return
+    }
+    let cancelled = false
+    layer.setRegions(selected.cca3, null)
+    fetch(`/data/admin1/${selected.cca3}.json`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((topo: Topology<{ admin1: GeometryCollection<AdminProps> }> | null) => {
+        if (cancelled || !topo) return
+        const fc = feature(topo, topo.objects.admin1)
+        layer.setRegions(selected.cca3, fc.features as AdminFeature[])
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [selected, showPlaces])
+
+  // 地名跟着地形起伏；平地时抬到选中国家高亮盖之上，否则省界会被半透明盖子罩住
+  useEffect(() => {
+    const exagg = showTerrain && !timeTravel ? exaggeration : 0
+    placesRef.current?.setTerrain(exagg ? elevRef.current : null, exagg, exagg ? 0 : 0.036)
+  }, [showTerrain, exaggeration, timeTravel, elevReady])
 
   // 自转开关只改变旋转状态，保留用户当前的缩放和观察位置。
   useEffect(() => {
@@ -841,7 +976,9 @@ export default function GlobeView() {
       world.polygonsData(featsRef.current as object[])
       window.setTimeout(() => applyStyles(world), 350)
     }
-  }, [timeTravel, eraIndex])
+    // meshReady：从 ?era= 链接直接进入时，地球网格可能还没建好，就绪后要再跑一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeTravel, eraIndex, meshReady])
 
   // 航天器/星座图层：真实轨道参数（高度/倾角/周期/轨道面），动画 300 倍速，标签逐帧投影
   useEffect(() => {
@@ -979,6 +1116,12 @@ export default function GlobeView() {
   return (
     <>
       <div ref={containerRef} className="absolute inset-0 z-0" />
+      {/* 地名覆盖层（城市 + 省级区划），不拦截指针 */}
+      <canvas
+        ref={placesCanvasRef}
+        className="pointer-events-none absolute inset-0 z-0 h-full w-full"
+        style={{ display: view === 'earth' ? '' : 'none' }}
+      />
       {/* 卫星标签覆盖层（随地球视图显隐） */}
       <div
         ref={satLabelsRef}

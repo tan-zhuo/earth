@@ -16,8 +16,11 @@ const LINE_LIFT = 0.0015
 const MAX_STEP_DEG = 0.2
 
 export interface BorderOptions {
-  sampler: ElevationSampler
+  /** 无地形时为 null：边界整体停在 baseLift 高度 */
+  sampler: ElevationSampler | null
   exaggeration: number
+  /** 额外的离地高度（地球半径倍数），默认只抬一点防 z-fighting */
+  baseLift?: number
   /** three-globe 的经纬度 → 世界坐标 */
   toXYZ: (lat: number, lng: number, alt: number) => { x: number; y: number; z: number }
   color: string
@@ -26,13 +29,14 @@ export interface BorderOptions {
 
 export function buildDrapedBorders(
   feats: Feature<Geometry>[],
-  { sampler, exaggeration, toXYZ, color, opacity }: BorderOptions,
+  { sampler, exaggeration, baseLift = LINE_LIFT, toXYZ, color, opacity }: BorderOptions,
 ): LineSegments {
   const pos: number[] = []
 
   const push = (lat: number, lng: number) => {
     // 海面以下不下沉：海岸线与海上边界留在海平面
-    const alt = LINE_LIFT + (Math.max(0, sampler(lat, lng)) * exaggeration) / EARTH_RADIUS_M
+    const ground = sampler ? Math.max(0, sampler(lat, lng)) : 0
+    const alt = baseLift + (ground * exaggeration) / EARTH_RADIUS_M
     const { x, y, z } = toXYZ(lat, lng, alt)
     pos.push(x, y, z)
   }

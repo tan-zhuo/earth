@@ -60,6 +60,10 @@ export default function Sidebar() {
   const toggleRoutes = useAppStore((s) => s.toggleRoutes)
   const showSatellites = useAppStore((s) => s.showSatellites)
   const toggleSatellites = useAppStore((s) => s.toggleSatellites)
+  const showPlaces = useAppStore((s) => s.showPlaces)
+  const togglePlaces = useAppStore((s) => s.togglePlaces)
+  const showClouds = useAppStore((s) => s.showClouds)
+  const toggleClouds = useAppStore((s) => s.toggleClouds)
   const showTerrain = useAppStore((s) => s.showTerrain)
   const toggleTerrain = useAppStore((s) => s.toggleTerrain)
   const showElevationTint = useAppStore((s) => s.showElevationTint)
@@ -175,6 +179,8 @@ export default function Sidebar() {
           {view === 'earth' && (
             <>
               <SectionTitle>{t('sections.layers')}</SectionTitle>
+              <ToggleRow label={t('layerPlaces')} on={showPlaces} onClick={togglePlaces} />
+              <ToggleRow label={t('layerClouds')} on={showClouds} onClick={toggleClouds} />
               <ToggleRow label={t('layerGdpBars')} on={showGdpBars} onClick={toggleGdpBars} />
               <ToggleRow label={t('layerFlags')} on={showFlags} onClick={toggleFlags} />
               <ToggleRow label={t('layerRoutes')} on={showRoutes} onClick={toggleRoutes} />

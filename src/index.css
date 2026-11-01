@@ -126,3 +126,12 @@ button:focus-visible, a:focus-visible {
 .globe-flag { --flag-width: 28px; display: flex; align-items: center; justify-content: center; width: calc(var(--flag-width) + 8px); height: calc(var(--flag-width) * .72 + 8px); padding: 4px; border: 1px solid #94a3b850; border-radius: 5px; background: #0f172ac9; box-shadow: 0 2px 8px #02061770; pointer-events: auto; cursor: pointer; }
 .globe-flag img { display: block; width: var(--flag-width); height: calc(var(--flag-width) * .72); object-fit: contain; }
 .globe-flag:hover, .globe-flag:focus-visible { border-color: #7dd3fc; background: #0c4a6e; outline: 2px solid #7dd3fc80; outline-offset: 2px; z-index: 2; }
+/* 今日推荐：手机在外观切换下方横跨全宽，桌面在顶栏下方左侧 */
+.daily-pick { position: fixed; top: 132px; left: 16px; right: 16px; z-index: 20; display: flex; align-items: stretch; border: 1px solid #33415580; border-radius: 12px; background: #0f172ad9; backdrop-filter: blur(16px); box-shadow: 0 8px 24px #02061760; }
+.daily-pick-main { display: flex; flex: 1; min-width: 0; align-items: center; gap: 10px; padding: 8px 4px 8px 10px; text-align: left; border-radius: 12px 0 0 12px; transition: background 0.15s; }
+.daily-pick-main:hover, .daily-pick-main:focus-visible { background: #1e3a5060; }
+.daily-pick-flag { display: flex; flex-shrink: 0; width: 40px; height: 28px; align-items: center; justify-content: center; }
+.daily-pick-flag img { max-width: 40px; max-height: 28px; border-radius: 3px; }
+.daily-pick-close { flex-shrink: 0; width: 36px; color: #64748b; font-size: 18px; border-radius: 0 12px 12px 0; }
+.daily-pick-close:hover, .daily-pick-close:focus-visible { color: #e2e8f0; }
+@media (min-width: 768px) { .daily-pick { top: 80px; right: auto; width: 330px; } }

@@ -25,6 +25,8 @@ export default {
     },
     layerGdpBars: 'Столбцы ВВП',
     layerFlags: 'Флаги',
+    layerPlaces: 'Названия (города · регионы)',
+    layerClouds: 'Облака',
     layerSatellites: 'Спутники',
     timeTravel: 'Путешествие во времени',
     layerRoutes: 'Морские пути',

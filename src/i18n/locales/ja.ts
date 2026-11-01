@@ -25,6 +25,8 @@ export default {
     },
     layerGdpBars: 'GDP バー',
     layerFlags: '国旗',
+    layerPlaces: '地名（都市・州）',
+    layerClouds: '雲',
     layerSatellites: '人工衛星',
     timeTravel: 'タイムトラベル',
     layerRoutes: '海上航路',

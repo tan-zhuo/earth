@@ -8,7 +8,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#020617" />
 
-    <!-- SEO 基础（域名变更时同步修改 src/seo.ts / robots.txt / build-sitemap.mjs） -->
+    <!--seo:head-->
+    <!-- SEO 基础（构建时由 scripts/prerender.mjs 按语言/国家整段替换；域名见 src/seo.ts） -->
     <title>Earth 3D 互动地球仪 - 世界地图·国家信息·GDP 排行 | Interactive 3D World Globe</title>
     <meta
       name="description"
@@ -65,6 +66,8 @@
         "codeRepository": "https://github.com/tan-zhuo/earth"
       }
     </script>
+
+    <!--/seo:head-->
 
     <!-- 启动页样式（内联，随 HTML 立即生效，不等 JS bundle） -->
     <style>
@@ -197,6 +200,7 @@
       }, 12000)
     </script>
 
+    <!--seo:body-->
     <!-- 静态可爬取内容：供不执行 JS 的搜索引擎（如百度）索引，用户不可见 -->
     <section
       style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)"
@@ -254,6 +258,7 @@
         Wikipedia.
       </p>
     </section>
+    <!--/seo:body-->
 
     <!-- 无 JS 时的可见降级提示 -->
     <noscript>

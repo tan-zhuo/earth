@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/useAppStore'
 import { LANGUAGES } from '../i18n'
+import { track } from '@vercel/analytics'
+import Icon from './Icon'
+import { pick } from '../i18n/pick'
 
 const btnBase =
   'inline-flex min-h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-slate-700/60 bg-slate-900/60 px-3 py-1.5 text-xs font-medium text-slate-300 backdrop-blur transition hover:border-sky-500/60 hover:text-sky-300'
@@ -50,6 +53,32 @@ function useFullscreen(): [boolean, () => void] {
   return [full, toggle]
 }
 
+/**
+ * 分享当前画面：URL 已随状态同步（国家 / 视图 / 时代），直接分享 location.href。
+ * 手机走系统分享面板，桌面复制链接并提示。
+ */
+function useShare(): [() => void, boolean] {
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const timer = window.setTimeout(() => setCopied(false), 2000)
+    return () => window.clearTimeout(timer)
+  }, [copied])
+  const share = () => {
+    const url = window.location.href
+    const title = document.title
+    track('share', { path: window.location.pathname + window.location.search })
+    const coarse = window.matchMedia('(pointer: coarse)').matches
+    if (coarse && navigator.share) {
+      navigator.share({ title, url }).catch(() => {})
+      return
+    }
+    const copy = navigator.clipboard?.writeText(url) ?? Promise.reject(new Error('clipboard unavailable'))
+    copy.then(() => setCopied(true)).catch(() => window.prompt(title, url))
+  }
+  return [share, copied]
+}
+
 /** 精简顶栏：菜单按钮 + 标题 + 上下文按钮 + 语言切换，其余入口在左侧抽屉 */
 export default function Header() {
   const { t, i18n } = useTranslation()
@@ -60,6 +89,8 @@ export default function Header() {
   const view = useAppStore((s) => s.view)
   const setSidebarOpen = useAppStore((s) => s.setSidebarOpen)
   const [fullscreen, toggleFullscreen] = useFullscreen()
+  const [share, copied] = useShare()
+  const shareLabel = pick(i18n.language, '分享当前画面', 'Share this view', 'この画面を共有', 'Поделиться')
 
   return (
     <header className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between gap-2 p-3 sm:p-4">
@@ -93,6 +124,15 @@ export default function Header() {
             <span aria-hidden="true">←</span><span className="ml-2 hidden sm:inline">{t('exitTimeTravel')}</span>
           </button>
         )}
+        <button onClick={share} className={`${btnBase} relative`} aria-label={shareLabel} title={shareLabel}>
+          <Icon name="share" size={16} />
+          <span className="ml-2 hidden lg:inline">{pick(i18n.language, '分享', 'Share', '共有', 'Поделиться')}</span>
+          {copied && (
+            <span role="status" className="absolute top-full right-0 mt-2 whitespace-nowrap rounded-lg border border-sky-500/40 bg-slate-900/95 px-3 py-1.5 text-xs text-sky-200 shadow-lg">
+              {pick(i18n.language, '链接已复制', 'Link copied', 'リンクをコピーしました', 'Ссылка скопирована')}
+            </span>
+          )}
+        </button>
         {FS_SUPPORTED && (
           <button
             onClick={toggleFullscreen}

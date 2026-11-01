@@ -25,6 +25,8 @@ export default {
     },
     layerGdpBars: 'GDP bars',
     layerFlags: 'Flags',
+    layerPlaces: 'Places (cities · provinces)',
+    layerClouds: 'Clouds',
     layerSatellites: 'Satellites',
     timeTravel: 'Time travel',
     layerRoutes: 'Sea routes',

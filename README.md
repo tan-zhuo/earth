@@ -2,7 +2,7 @@
 
 # Earth · 交互式 3D 地球
 
-类似 Google Earth 的纯前端 3D 地球应用：旋转 / 缩放地球，点击国家查看国旗、人口、GDP、政体等信息，支持中英文切换。
+类似 Google Earth 的纯前端 3D 地球应用：旋转 / 缩放地球，点击国家查看国旗、人口、GDP、政体等信息，支持中、英、日、俄四种语言。
 
 作者：[tan-zhuo](https://github.com/tan-zhuo) · 博客：[tanzhuo.xyz](https://tanzhuo.xyz) · 在线体验：[www.earth.kim](https://www.earth.kim)
 
@@ -37,6 +37,8 @@ npm run build    # 类型检查 + 生产构建 → dist/
 | 地球贴图 | three-globe 附带 NASA 贴图 | 随应用自托管（`public/textures/`） |
 | 地形高程 / 海底地形 | [NOAA ETOPO1](https://www.ncei.noaa.gov/products/etopo-global-relief-model)（1 弧分全球地形，公有领域） | **构建时**降采样为高程贴图 → `public/textures/earth-height-rg-4096.png`、`earth-relief-4k.png`（4096×2048，RG 通道按整数米编码；空间分辨率仍为全球网格尺度） |
 | 政治体制 / 首都中文名 | 本地精选静态数据 `src/data/countryExtras.ts` | 构建时打包 |
+| 省级行政区 / 城市 | [Natural Earth](https://www.naturalearthdata.com/) 10m admin-1 与 populated places（公有领域），中文名经 OpenCC 统一为简体 | **构建时**由 `node scripts/build-places.mjs` 生成 → `public/data/admin1/{CCA3}.json`（每国一个 TopoJSON，选中时按需加载）、`public/data/cities.json`（约 5000 个城市） |
+| 云层 / 海陆掩码 | globe.gl / three-globe 示例贴图 | 自托管：`public/textures/earth-clouds.jpg`（取原图 alpha 通道）、`earth-water.jpg` |
 
 > 注意：REST Countries v3.1 API 已于 2026 年弃用（新版 v5 需注册），因此本项目不在运行时依赖它，改为构建时静态化上游数据集。更新国家数据：`node scripts/build-countries.mjs`。
 
@@ -49,6 +51,8 @@ earth/
 │   └── textures/                   # 地球夜景贴图、星空背景
 ├── scripts/
 │   ├── build-countries.mjs         # 构建时生成 src/data/countries.json
+│   ├── build-places.mjs            # 由 Natural Earth 生成省级区划与城市数据
+│   ├── prerender.mjs               # 构建后预渲染各语言 × 各国静态页 + sitemap
 │   └── build-terrain.mjs           # 构建时由 NOAA ETOPO1 生成高程/起伏贴图
 ├── src/
 │   ├── components/
@@ -102,7 +106,12 @@ earth/
 - 国家历史：详情面板内嵌维基百科历史摘要（中英随语言切换，30 天缓存），附"继续阅读"链接
 - 地形起伏（NOAA ETOPO1）：山脉与海底地形按真实高程做**顶点位移**（球面细分到 900×450，地平线上能看出山体轮廓与遮挡）+ 坡面法线光照与山体阴影，垂直夸张 ×1~×60 可调，开启后可贴近地表观察；国界改为贴着地形走的折线，悬停/选中的高亮直接画进地表（不再是悬空的平顶盖）；「高程着色」按海拔/水深上色并附色带图例；指针悬停实时读出该点海拔/水深
 - 时间旅行模式：从 7.5 亿年前的罗迪尼亚超大陆到现代，16 个地质时代的古地理 3D 演变，支持时间轴拖动与自动播放（古地理图 © C.R. Scotese PALEOMAP Project）
-- 中英文切换：自动检测浏览器语言、localStorage 记忆、面板内容同步切换
+- 地名图层：选中国家后显示省/州边界与名称；首都、省会、大城市按缩放逐级出现，canvas 覆盖层按重要程度避让，四语地名
+- 地球外观：白天 / 夜间 / 实时三种；「实时」按当前 UTC 时间计算太阳直射点，晨昏线真实，背光面亮起城市灯光；海洋有太阳高光，云层缓慢漂移、贴近地表时自动淡出
+- 今日推荐：每天一个国家（同一天所有人相同），点击直接飞过去，可当天关闭
+- 分享：URL 实时同步当前国家 / 视图 / 时间旅行年代（如 `/en/?era=240`、`/ja/?view=solar`），顶栏「分享」按钮在手机上调起系统分享面板，桌面上复制链接
+- PWA：Service Worker 缓存构建产物与贴图，添加到主屏幕后二次打开基本不走网络
+- 中/英/日/俄切换：自动检测浏览器语言、localStorage 记忆、面板内容同步切换；带语言前缀的链接（`/zh/` `/en/` `/ja/` `/ru/`）强制对应语言
 - 响应式：桌面右侧面板 / 移动端底部抽屉
 - 返回地球总览按钮
 
@@ -115,15 +124,19 @@ earth/
 
 已接入 **Vercel Analytics**（访问量）与 **Speed Insights**（Core Web Vitals），部署后在 Vercel 项目的 Analytics / Speed Insights 标签页启用即可看到数据（免费额度够用），本地开发不上报。
 
-> 线上地址：[www.earth.kim](https://www.earth.kim)。域名变更时需同步修改：`src/seo.ts`、`index.html`、`public/robots.txt`、`scripts/build-sitemap.mjs`（改后重跑生成 sitemap）。
+> 线上地址：[www.earth.kim](https://www.earth.kim)。域名变更时需同步修改：`src/seo.ts`、`index.html`、`public/robots.txt`（sitemap 随构建自动生成）。
 
 ## SEO
 
-- 完整 meta：description / keywords / canonical / Open Graph / Twitter Card / theme-color
-- `og.png` 分享图、`robots.txt`、`sitemap.xml`（含 zh-CN / en hreflang）
-- Schema.org WebApplication 结构化数据（JSON-LD）
-- 标题与 `<html lang>` 随语言、选中国家动态更新（如「中国 - Earth · 3D 互动地球」）
-- `<noscript>` 双语降级文案
+- **预渲染**：`npm run build` 在 Vite 构建后运行 `scripts/prerender.mjs`，以 `dist/index.html` 为模板为每个页面输出独立静态 HTML，共 1255 页：
+  - `/`、`/country/{cca3}`：x-default（中英双语正文，界面按浏览器语言）
+  - `/{zh,en,ja,ru}/`、`/{lang}/country/{cca3}`：各语言独立页面
+- 每页有独立的 title / description / canonical / Open Graph / Twitter Card，带四种语言加 x-default 的 hreflang，以及 JSON-LD（首页 WebApplication；国家页 WebPage + Country + BreadcrumbList）
+- 隐藏正文供不执行 JS 的爬虫（如百度）索引：国家概况、省级行政区列表、主要城市与人口、同地区国家互链
+- 标题和描述的唯一来源是 `src/seo.ts`，应用内动态标题也用它，静态 HTML 与打开后的页面一致
+- `sitemap.xml` 由预渲染脚本生成（同时写回 `public/`），每个 URL 列出全部语言版本
+- `index.html` 中 `<!--seo:head-->` / `<!--seo:body-->` 标记之间的内容会被整段替换，修改时保留标记
+- 域名变更：改 `src/seo.ts` 的 `SITE_URL` 与 `public/robots.txt`
 
 ## 后续计划
 
